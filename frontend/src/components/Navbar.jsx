@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useCart } from '../hooks/useCart.js';
-import { ShoppingCart, Sparkles, LogOut, MapPin, User, ShieldAlert, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, LogOut, MapPin, User, ShieldAlert, ShoppingBag } from 'lucide-react';
 
 export default function Navbar() {
   const { user, isAuthenticated, logoutUser } = useAuth();
@@ -37,7 +37,7 @@ export default function Navbar() {
               InstaDispatch
             </span>
             <span class="text-[9px] text-[#22C55E] font-extrabold tracking-wider uppercase leading-none">
-              AI Smart Assistant
+              Hyperlocal Grocery
             </span>
           </div>
         </Link>
@@ -54,11 +54,11 @@ export default function Navbar() {
           {isAuthenticated && user?.role === 'customer' && (
             <>
               <Link 
-                to="/ai-search" 
-                class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider transition-colors ${isActive('/ai-search') ? 'text-[#22C55E]' : 'text-[#6B7280] hover:text-[#111827]'}`}
+                to="/products" 
+                class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider transition-colors ${isActive('/products') ? 'text-[#22C55E]' : 'text-[#6B7280] hover:text-[#111827]'}`}
               >
-                <Sparkles class="w-3.5 h-3.5 text-[#22C55E]" />
-                AI Shopping
+                <ShoppingBag class="w-3.5 h-3.5" />
+                Shop
               </Link>
               <Link 
                 to="/orders" 

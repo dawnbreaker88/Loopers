@@ -33,9 +33,8 @@ export default function PaymentPage() {
 
   if (!address) return null;
 
-  const deliveryFee = totalPrice > 500 ? 0 : 30;
-  const taxes = Math.round(totalPrice * 0.05);
-  const grandTotal = Math.round(totalPrice + deliveryFee + taxes);
+  const deliveryFee = 1;
+  const grandTotal = Math.round(totalPrice + deliveryFee);
 
   const handlePaymentSuccess = async (paymentDetails) => {
     setIsModalOpen(false);

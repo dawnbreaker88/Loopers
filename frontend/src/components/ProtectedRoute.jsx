@@ -20,7 +20,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       ? '/admin' 
       : user.role === 'delivery_agent' 
         ? '/agent' 
-        : '/ai-search';
+        : '/dashboard';
     return <Navigate to={defaultRedirect} replace />;
   }
 

@@ -33,21 +33,7 @@ export const addSingleItem = createAsyncThunk(
   }
 );
 
-// Thunk to add bulk items (e.g. from AI shopping recipes list)
-export const addBulkItems = createAsyncThunk(
-  'cart/addBulk',
-  async (items, { rejectWithValue }) => {
-    try {
-      const response = await api.post('/api/cart/add', { items });
-      if (response.data.success) {
-        return response.data.cart;
-      }
-      return rejectWithValue('Failed to add items');
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Error adding items');
-    }
-  }
-);
+
 
 // Thunk to update item quantity
 export const updateCartQty = createAsyncThunk(
@@ -123,9 +109,7 @@ const cartSlice = createSlice({
       .addCase(addSingleItem.pending, handleCartPending)
       .addCase(addSingleItem.fulfilled, handleCartFulfilled)
       .addCase(addSingleItem.rejected, handleCartRejected)
-      .addCase(addBulkItems.pending, handleCartPending)
-      .addCase(addBulkItems.fulfilled, handleCartFulfilled)
-      .addCase(addBulkItems.rejected, handleCartRejected)
+
       .addCase(updateCartQty.pending, handleCartPending)
       .addCase(updateCartQty.fulfilled, handleCartFulfilled)
       .addCase(updateCartQty.rejected, handleCartRejected)

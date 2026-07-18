@@ -115,17 +115,8 @@ export default function CheckoutPage() {
   }, [selectedAddress]);
 
   const deliveryFee = React.useMemo(() => {
-    if (totalPrice > 500) return 0;
-    if (!selectedAddress) return 30;
-    
-    const storeCoords = { lat: 12.9724, lng: 77.5951 };
-    const addrCoords = getCoordsFromAddress(selectedAddress);
-    const distance = calculateDistance(storeCoords.lat, storeCoords.lng, addrCoords.lat, addrCoords.lng);
-    
-    if (distance <= 2.5) return 20; // discount for nearby dispatches
-    if (distance > 5) return 50;    // long distance dispatches
-    return 30;                      // standard
-  }, [totalPrice, selectedAddress]);
+    return 1;
+  }, []);
 
   if (!items || items.length === 0) {
     return (
@@ -133,9 +124,9 @@ export default function CheckoutPage() {
         <EmptyState 
           type="cart"
           title="No items to checkout"
-          message="Your cart is empty. Try using our AI Assistant to build a shopping list first."
-          actionText="Go to AI Shopping"
-          onAction={() => navigate('/ai-search')}
+          message="Your cart is empty. Add products to your cart before checking out."
+          actionText="Explore Products"
+          onAction={() => navigate('/products')}
         />
       </div>
     );
@@ -208,8 +199,7 @@ export default function CheckoutPage() {
     navigate('/payment', { state: { address: selectedAddress } });
   };
 
-  const taxes = Math.round(totalPrice * 0.05);
-  const grandTotal = Math.round(totalPrice + deliveryFee + taxes);
+  const grandTotal = Math.round(totalPrice + deliveryFee);
 
   return (
     <div class="space-y-6 py-4">
@@ -323,10 +313,7 @@ export default function CheckoutPage() {
               <span>Handling & Delivery partner fee</span>
               <span class="text-[#111827]">₹{deliveryFee}</span>
             </div>
-            <div class="flex justify-between items-center">
-              <span>Taxes (GST 5%)</span>
-              <span class="text-[#111827]">₹{taxes}</span>
-            </div>
+
             <div class="pt-4 border-t border-[#E5E7EB]/50 flex justify-between items-center text-sm">
               <span class="font-extrabold text-[#111827]">To Pay</span>
               <span class="font-black text-[#111827] text-md">₹{grandTotal}</span>
