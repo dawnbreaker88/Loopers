@@ -1,5 +1,4 @@
 import User from '../models/User.js';
-import DeliveryAgent from '../models/DeliveryAgent.js';
 import { generateAccessToken, generateRefreshToken } from '../middleware/auth.js';
 
 // @desc    Register a new user
@@ -38,30 +37,6 @@ export const registerUser = async (req, res) => {
       role: finalRole
     });
 
-    // If registering as delivery agent, automatically create DeliveryAgent entry
-    if (user.role === 'delivery_agent') {
-      await DeliveryAgent.create({
-        user: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        currentLocation: undefined,
-        isAvailable: false,
-        approvalStatus: 'pending'
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: 'Delivery Agent registered successfully. Your profile is pending admin approval.',
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role
-        }
-      });
-    }
 
     // Generate tokens
     const accessToken = generateAccessToken(user);
@@ -91,17 +66,21 @@ export const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, identifier, password } = req.body;
+  const loginIdentifier = identifier || email;
 
   try {
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide email/phone and password' });
     }
 
-    // Find user by email
-    const user = await User.findOne({ email });
+    // Find user by email or phone
+    const user = await User.findOne({ 
+      $or: [{ email: loginIdentifier }, { phone: loginIdentifier }] 
+    });
+    
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     // Check password match
@@ -118,17 +97,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // Check delivery agent approval status
-    if (user.role === 'delivery_agent') {
-      const agent = await DeliveryAgent.findOne({ user: user._id });
-      if (!agent || agent.approvalStatus !== 'approved') {
-        const status = agent ? agent.approvalStatus : 'pending';
-        return res.status(403).json({
-          success: false,
-          message: `Your registration status is ${status}. You can log in once approved by the admin.`
-        });
-      }
-    }
 
     // Generate tokens
     const accessToken = generateAccessToken(user);
@@ -229,17 +197,6 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    // Check delivery agent approval status
-    if (user.role === 'delivery_agent') {
-      const agent = await DeliveryAgent.findOne({ user: user._id });
-      if (!agent || agent.approvalStatus !== 'approved') {
-        const status = agent ? agent.approvalStatus : 'pending';
-        return res.status(403).json({
-          success: false,
-          message: `Your registration status is ${status}. You can log in once approved by the admin.`
-        });
-      }
-    }
 
     // Generate tokens
     const accessToken = generateAccessToken(user);
@@ -425,14 +382,6 @@ export const updateUserLocation = async (req, res) => {
     user.location = { latitude, longitude };
     await user.save();
 
-    // If delivery agent, update delivery agent currentLocation too!
-    if (user.role === 'delivery_agent') {
-      const agent = await DeliveryAgent.findOne({ user: user._id });
-      if (agent) {
-        agent.currentLocation = { lat: latitude, lng: longitude };
-        await agent.save();
-      }
-    }
 
     return res.json({
       success: true,

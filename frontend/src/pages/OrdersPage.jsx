@@ -136,39 +136,8 @@ export default function OrdersPage() {
 
             {/* Form */}
             <form onSubmit={handleRatingSubmit} class="p-6 space-y-5 text-xs font-semibold text-[#6B7280]">
-              {/* Agent star rating */}
-              <div class="space-y-2 text-center">
-                <label class="text-[10px] font-extrabold uppercase tracking-wider block">Rate Delivery Agent</label>
-                <div class="flex justify-center gap-1.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setAgentRating(star)}
-                      class="text-2xl transition-transform hover:scale-110"
-                    >
-                      <Star class={`w-7 h-7 stroke-none ${star <= agentRating ? 'fill-[#F59E0B]' : 'fill-slate-100 border'}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Review Comments */}
-              <div class="space-y-1">
-                <label class="text-[10px] font-extrabold uppercase tracking-wider block pl-0.5">Write a Review for Rider</label>
-                <div class="relative">
-                  <MessageSquare class="absolute left-3.5 top-3.5 w-4 h-4 text-[#6B7280]" />
-                  <textarea
-                    placeholder="He was polite and delivered the parcel safely..."
-                    value={agentReview}
-                    onChange={(e) => setAgentReview(e.target.value)}
-                    class="w-full text-xs font-semibold border rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-[#22C55E] resize-none h-20 leading-relaxed"
-                  />
-                </div>
-              </div>
-
               {/* App experience rating */}
-              <div class="space-y-2 text-center border-t border-[#E5E7EB] pt-4">
+              <div class="space-y-2 text-center">
                 <label class="text-[10px] font-extrabold uppercase tracking-wider block">Rate App Experience</label>
                 <div class="flex justify-center gap-1.5">
                   {[1, 2, 3, 4, 5].map((star) => (

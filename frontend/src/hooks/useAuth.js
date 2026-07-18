@@ -70,7 +70,6 @@ export const useAuth = () => {
     verifyToken,
     updateProfile,
     isAdmin: user?.role === 'admin',
-    isAgent: user?.role === 'delivery_agent',
     isCustomer: user?.role === 'customer' || !user?.role,
   };
 };

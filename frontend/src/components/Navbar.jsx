@@ -71,24 +71,25 @@ export default function Navbar() {
           )}
 
           {isAuthenticated && user?.role === 'admin' && (
-            <Link 
-              to="/admin" 
-              class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#EF4444] transition-colors`}
-            >
-              <ShieldAlert class="w-3.5 h-3.5" />
-              Admin Panel
-            </Link>
+            <>
+              <Link 
+                to="/admin/orders" 
+                class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#EF4444] transition-colors ${isActive('/admin/orders') ? 'underline font-black' : ''}`}
+              >
+                <ShoppingBag class="w-3.5 h-3.5" />
+                Manage Orders
+              </Link>
+              <Link 
+                to="/dashboard" 
+                class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#111827] transition-colors ${isActive('/dashboard') ? 'text-[#22C55E]' : ''}`}
+              >
+                <ShieldAlert class="w-3.5 h-3.5" />
+                Admin Console
+              </Link>
+            </>
           )}
 
-          {isAuthenticated && user?.role === 'delivery_agent' && (
-            <Link 
-              to="/agent" 
-              class={`flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider text-[#F59E0B] transition-colors`}
-            >
-              <MapPin class="w-3.5 h-3.5 animate-bounce" />
-              Agent Hub
-            </Link>
-          )}
+
         </div>
 
         {/* Right Side: Cart, Profile & Actions */}

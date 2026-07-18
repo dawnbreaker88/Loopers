@@ -21,6 +21,7 @@ import CheckoutPage from './pages/CheckoutPage.jsx';
 import PaymentPage from './pages/PaymentPage.jsx';
 import OrderTrackingPage from './pages/OrderTrackingPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
+import AdminOrdersPage from './pages/AdminOrdersPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import useGeoLocation from './hooks/useGeoLocation.js';
@@ -123,6 +124,16 @@ function AppContent() {
                   <ProfilePage />
                 </ProtectedRoute>
               }
+            />
+
+            {/* Admin Dedicated Routes */}
+            <Route 
+              path="/admin/orders" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminOrdersPage />
+                </ProtectedRoute>
+              } 
             />
 
             {/* Legacy Fallback Redirects for Old Slugs */}

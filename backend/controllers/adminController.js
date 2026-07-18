@@ -1,5 +1,4 @@
 import User from '../models/User.js';
-import DeliveryAgent from '../models/DeliveryAgent.js';
 import Order from '../models/Order.js';
 
 // @desc    Get all users
@@ -51,49 +50,7 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
-// @desc    Update delivery agent status (approval, active)
-// @route   PUT /api/admin/agents/:id/status
-// @access  Private/Admin
-export const updateAgentStatus = async (req, res) => {
-  const { approvalStatus, isActive, isAvailable } = req.body;
-  try {
-    const agent = await DeliveryAgent.findById(req.params.id);
-    if (!agent) {
-      return res.status(404).json({ success: false, message: 'Delivery Agent not found' });
-    }
 
-    if (approvalStatus !== undefined) {
-      agent.approvalStatus = approvalStatus;
-      if (approvalStatus === 'approved') {
-        agent.isAvailable = true;
-      } else {
-        agent.isAvailable = false;
-        agent.isOnline = false;
-      }
-    }
-
-    if (isAvailable !== undefined) {
-      agent.isAvailable = isAvailable;
-    }
-
-    await agent.save();
-
-    // Also update corresponding User status if isActive is passed
-    if (isActive !== undefined) {
-      const user = await User.findById(agent.user);
-      if (user) {
-        user.isActive = isActive;
-        user.status = isActive ? 'active' : 'deactivated';
-        await user.save();
-      }
-    }
-
-    return res.json({ success: true, message: 'Agent status updated successfully', agent });
-  } catch (error) {
-    console.error('Update Agent Status Error:', error.message);
-    return res.status(500).json({ success: false, message: 'Server error updating agent status' });
-  }
-};
 
 // @desc    Get admin analytics
 // @route   GET /api/admin/analytics
@@ -103,10 +60,10 @@ export const getAdminAnalytics = async (req, res) => {
     const totalOrders = await Order.countDocuments({});
     
     const activeOrders = await Order.countDocuments({
-      orderStatus: { $in: ['Order Confirmed', 'Preparing', 'Assigned', 'Picked Up', 'On The Way', 'Near You'] }
+      orderStatus: { $in: ['Placed', 'Accepted', 'Packed', 'Out For Delivery'] }
     });
 
-    const completedOrders = await Order.countDocuments({ orderStatus: 'Delivered' });
+    const completedOrders = await Order.countDocuments({ orderStatus: 'Completed' });
 
     // Aggregate revenues and delivery charges
     const revenueResult = await Order.aggregate([
@@ -116,12 +73,6 @@ export const getAdminAnalytics = async (req, res) => {
     const revenue = revenueResult[0] ? revenueResult[0].totalRevenue : 0;
     const deliveryCharges = revenueResult[0] ? revenueResult[0].totalDeliveryCharge : 0;
 
-    // Aggregate agent earnings
-    const agentEarningsResult = await DeliveryAgent.aggregate([
-      { $group: { _id: null, totalEarnings: { $sum: '$earnings' } } }
-    ]);
-    const agentEarnings = agentEarningsResult[0] ? agentEarningsResult[0].totalEarnings : 0;
-
     return res.json({
       success: true,
       analytics: {
@@ -129,8 +80,7 @@ export const getAdminAnalytics = async (req, res) => {
         activeOrders,
         completedOrders,
         revenue,
-        deliveryCharges,
-        agentEarnings
+        deliveryCharges
       }
     });
   } catch (error) {
@@ -138,3 +88,65 @@ export const getAdminAnalytics = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error retrieving analytics' });
   }
 };
+
+// Add order transition handlers
+const updateOrderStatus = async (req, res, status) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    
+    order.orderStatus = status;
+    order.trackingHistory.push({
+      status,
+      timestamp: new Date()
+    });
+    
+    if (status === 'Completed' && order.paymentStatus !== 'Completed') {
+        order.paymentStatus = 'Completed';
+    }
+    if (status === 'Cancelled' && order.paymentStatus === 'Completed') {
+        order.paymentStatus = 'Refunded';
+    }
+    
+    await order.save();
+
+    // Populate user details for real-time views
+    await order.populate('user', 'name email phone');
+
+    // Emit socket events
+    const io = req.app.get('socketio');
+    if (io) {
+      const userRoom = order.user._id ? order.user._id.toString() : order.user.toString();
+
+      // Emit to admin room
+      io.to('admin').emit('orderUpdated', order);
+
+      // Emit to user room
+      io.to(userRoom).emit('orderUpdated', order);
+      io.to(userRoom).emit('order-status-update', {
+        orderId: order._id,
+        status: status
+      });
+
+      // Emit specific status events
+      if (status === 'Accepted') io.to(userRoom).emit('orderAccepted', order);
+      if (status === 'Packed') io.to(userRoom).emit('orderPacked', order);
+      if (status === 'Out For Delivery') io.to(userRoom).emit('orderOutForDelivery', order);
+      if (status === 'Delivered' || status === 'Completed') io.to(userRoom).emit('orderDelivered', order);
+      if (status === 'Cancelled') io.to(userRoom).emit('orderCancelled', order);
+    }
+
+    return res.json({ success: true, message: `Order marked as ${status}`, order });
+  } catch (error) {
+    console.error(`Update Order Status Error (${status}):`, error.message);
+    return res.status(500).json({ success: false, message: 'Server error updating order' });
+  }
+};
+
+export const acceptOrder = (req, res) => updateOrderStatus(req, res, 'Accepted');
+export const packOrder = (req, res) => updateOrderStatus(req, res, 'Packed');
+export const outForDeliveryOrder = (req, res) => updateOrderStatus(req, res, 'Out For Delivery');
+export const deliverOrder = (req, res) => updateOrderStatus(req, res, 'Delivered');
+export const cancelOrderAdmin = (req, res) => updateOrderStatus(req, res, 'Cancelled');

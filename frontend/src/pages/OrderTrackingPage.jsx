@@ -29,8 +29,7 @@ export default function OrderTrackingPage() {
   const { activeOrder, loading, error } = useSelector((state) => state.orders);
 
   // Real-time tracking data overrides
-  const [orderStatus, setOrderStatus] = useState('Order Confirmed');
-  const [agent, setAgent] = useState(null);
+  const [orderStatus, setOrderStatus] = useState('Placed');
   const [eta, setEta] = useState('15 mins');
 
   // Coordinates constants
@@ -55,34 +54,23 @@ export default function OrderTrackingPage() {
       .unwrap()
       .then((res) => {
         setOrderStatus(res.orderStatus);
-        if (res.deliveryAgent) {
-          setAgent(res.deliveryAgent);
-        }
       })
       .catch(() => {
         toast.error('Failed to load tracking data');
       });
   }, [orderId, dispatch]);
 
-  // Hook up real-time socket tracking
-  // In services/dispatchService, the socket emissions send events like 'order-update' 
-  // with orderId, orderStatus, agent coordinates, etc.
-  // We specify these event callbacks below
   const handleSocketStatusUpdate = (data) => {
     if (data.orderId === orderId) {
       setOrderStatus(data.orderStatus);
-      if (data.agent) {
-        setAgent(data.agent);
-      }
       
       // Calculate eta based on status
       let predictedEta = '15 mins';
-      if (data.orderStatus === 'Preparing') predictedEta = '12 mins';
-      if (data.orderStatus === 'Assigned') predictedEta = '10 mins';
-      if (data.orderStatus === 'Picked Up') predictedEta = '7 mins';
-      if (data.orderStatus === 'On The Way') predictedEta = '4 mins';
-      if (data.orderStatus === 'Near You') predictedEta = '1 min';
-      if (data.orderStatus === 'Delivered') {
+      if (data.orderStatus === 'Placed') predictedEta = '15 mins';
+      if (data.orderStatus === 'Accepted') predictedEta = '12 mins';
+      if (data.orderStatus === 'Packed') predictedEta = '10 mins';
+      if (data.orderStatus === 'Out For Delivery') predictedEta = '5 mins';
+      if (data.orderStatus === 'Delivered' || data.orderStatus === 'Completed') {
         predictedEta = 'Arrived';
         toast.success('Your order has been delivered!');
       }
@@ -94,9 +82,7 @@ export default function OrderTrackingPage() {
   };
 
   const handleSocketLocationUpdate = (data) => {
-    if (data.orderId === orderId && data.agent) {
-      setAgent(data.agent);
-    }
+    // No agent location updates needed in 2-role system
   };
 
   // Connect to Socket.io via custom hook
@@ -117,8 +103,8 @@ export default function OrderTrackingPage() {
   }
 
   // Delivery Progress statuses
-  const statusSteps = ['Order Confirmed', 'Preparing', 'Assigned', 'Picked Up', 'On The Way', 'Near You', 'Delivered'];
-  const activeIndex = statusSteps.indexOf(orderStatus);
+  const statusSteps = ['Placed', 'Accepted', 'Packed', 'Out For Delivery', 'Delivered'];
+  const activeIndex = statusSteps.indexOf(orderStatus === 'Completed' ? 'Delivered' : orderStatus);
 
   return (
     <div class="space-y-6 py-4">
@@ -141,8 +127,6 @@ export default function OrderTrackingPage() {
             <DeliveryTracker 
               storeCoords={storeCoords}
               customerCoords={customerCoords}
-              agentCoords={agent?.currentLocation}
-              agentName={agent?.name}
             />
           </div>
 
@@ -183,53 +167,30 @@ export default function OrderTrackingPage() {
           </div>
         </div>
 
-        {/* Right: Rider profile & Billing summaries */}
+        {/* Right: Delivery Details & Billing summaries */}
         <div class="lg:col-span-4 space-y-6">
-          {/* Rider profile */}
-          <div class="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-6">
-            <h3 class="font-extrabold text-sm text-[#111827] uppercase tracking-wider border-b pb-3">Rider Profile</h3>
-
-            {agent ? (
-              <div class="space-y-4">
-                <div class="flex items-center gap-4">
-                  <div class="w-12 h-12 bg-slate-50 border rounded-2xl flex items-center justify-center font-black text-xs text-[#22C55E] uppercase tracking-wider">
-                    {agent.name.split(' ').map(n=>n[0]).join('')}
-                  </div>
-                  <div>
-                    <span class="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block">Assigned Rider</span>
-                    <h4 class="font-extrabold text-sm text-[#111827] leading-tight">{agent.name}</h4>
-                    <span class="text-[9px] text-[#F59E0B] font-extrabold flex items-center gap-0.5 mt-0.5">
-                      <Star class="w-3.5 h-3.5 fill-[#F59E0B] stroke-none" /> {agent.rating || '5.0'} ({agent.ratingsCount || 10} reviews)
-                    </span>
-                  </div>
-                </div>
-
-                <div class="space-y-2 pt-2.5 border-t border-[#E5E7EB]/50 text-xs font-semibold text-[#6B7280]">
-                  <div class="flex items-center gap-2">
-                    <Phone class="w-4 h-4 text-[#6B7280]" />
-                    <span class="text-[#111827]">{agent.phone}</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <Truck class="w-4 h-4 text-[#6B7280]" />
-                    <span>Rider Vehicle: Hero Electric Cycle</span>
-                  </div>
-                </div>
-
-                <a 
-                  href={`tel:${agent.phone}`}
-                  class="w-full flex items-center justify-center gap-2 bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22C55E]/15 text-xs uppercase tracking-wider"
-                >
-                  <Phone class="w-3.5 h-3.5" /> Call delivery rider
-                </a>
+          {/* Delivery Destination info instead of Rider profile */}
+          <div class="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
+            <h3 class="font-extrabold text-sm text-[#111827] uppercase tracking-wider border-b pb-3">Delivery Information</h3>
+            <div class="space-y-3 text-xs font-semibold text-[#6B7280]">
+              <div>
+                <span class="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block">Customer</span>
+                <p class="text-sm font-extrabold text-[#111827]">{activeOrder.address.name}</p>
               </div>
-            ) : (
-              <div class="py-4 text-center space-y-2">
-                <div class="w-7 h-7 border-2 border-[#22C55E] border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p class="text-xs text-[#6B7280] font-semibold leading-relaxed max-w-xs mx-auto">
-                  Rider selection is in progress... Auto-dispatch algorithm is locating nearby riders.
+              <div>
+                <span class="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block">Contact Phone</span>
+                <p class="text-[#111827]">{activeOrder.address.phone}</p>
+              </div>
+              <div>
+                <span class="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block">Delivery Address</span>
+                <p class="text-[#111827] leading-relaxed">
+                  {activeOrder.address.houseNumber}, {activeOrder.address.street}, {activeOrder.address.city}, {activeOrder.address.state} - {activeOrder.address.pincode}
                 </p>
+                {activeOrder.address.landmark && (
+                  <p class="text-[10px] text-[#6B7280] mt-1">Landmark: {activeOrder.address.landmark}</p>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Items summary */}

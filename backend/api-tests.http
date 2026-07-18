@@ -41,19 +41,7 @@ Content-Type: application/json
   "role": "customer"
 }
 
-### 2. Register Delivery Agent
-# Purpose: Create a new delivery agent account
-# Expected Response: 201 Created with success: true, accessToken, and auto-created agent details
-POST http://localhost:5000/api/auth/register
-Content-Type: application/json
 
-{
-  "name": "Rohan Das",
-  "email": "rohan@delivery.com",
-  "phone": "9144972049",
-  "password": "agentpassword123",
-  "role": "delivery_agent"
-}
 
 ### 3. Register Administrator
 # Purpose: Create a new administrator account
@@ -302,60 +290,13 @@ Content-Type: application/json
   "orderId": "{{orderId}}"
 }
 
-### 5. Rate Order and Agent (Protected - Customer Only)
-# Purpose: Save customer ratings for delivery speed and application experience
+### 5. Rate Order (Protected - Customer Only)
+# Purpose: Save customer ratings for application experience
 # Expected Response: 200 OK with order containing the ratings
 POST {{baseUrl}}/orders/{{orderId}}/rate
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "agentRating": 5,
-  "agentReview": "Super fast delivery and very courteous!",
   "experienceRating": 5
-}
-
-
-### ============================================================================
-### MODULE 6: DISPATCHER ENGINE
-### ============================================================================
-
-### 1. Track Order Status & Location (Protected)
-# Purpose: Retrieve order status, agent assignments, and real-time transit location coordinates
-# Expected Response: 200 OK with status and location object
-GET {{baseUrl}}/dispatch/track/{{orderId}}
-Authorization: Bearer {{token}}
-
-### 2. Update Agent Location & Availability (Protected - Agent Only)
-# Purpose: Let the active agent report their current GPS position and toggle availability
-# Expected Response: 200 OK with updated location/status
-# Authorization: Requires Delivery Agent JWT token
-PUT {{baseUrl}}/dispatch/update-location
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "lat": 12.9785,
-  "lng": 77.6405,
-  "isAvailable": false
-}
-
-### 3. Get All Delivery Agents (Protected - Admin Only)
-# Purpose: List all registered delivery agents, their current positions, and assignment status
-# Expected Response: 200 OK with agent list
-# Authorization: Requires Admin JWT token
-GET {{baseUrl}}/dispatch/agents
-Authorization: Bearer {{token}}
-
-### 4. Manual / Force Assign Agent (Protected - Admin Only)
-# Purpose: Manually force/assign a delivery agent to an order (overriding automatic routing)
-# Expected Response: 200 OK with order and assigned agent details
-# Authorization: Requires Admin JWT token
-POST {{baseUrl}}/dispatch/assign
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{
-  "orderId": "{{orderId}}",
-  "agentId": "{{agentId}}"
 }

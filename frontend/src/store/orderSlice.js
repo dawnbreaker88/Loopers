@@ -96,19 +96,13 @@ const orderSlice = createSlice({
       state.activeOrder = null;
     },
     updateOrderStatusLocal: (state, action) => {
-      const { orderId, orderStatus, deliveryAgent } = action.payload;
+      const { orderId, orderStatus } = action.payload;
       if (state.activeOrder && state.activeOrder._id === orderId) {
         state.activeOrder.orderStatus = orderStatus;
-        if (deliveryAgent) {
-          state.activeOrder.deliveryAgent = deliveryAgent;
-        }
       }
       const existing = state.orders.find(o => o._id === orderId);
       if (existing) {
         existing.orderStatus = orderStatus;
-        if (deliveryAgent) {
-          existing.deliveryAgent = deliveryAgent;
-        }
       }
     }
   },
