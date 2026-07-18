@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { User, Mail, Phone, Shield, MapPin, HandCoins, Lock, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [updating, setUpdating] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -192,7 +194,7 @@ export default function ProfilePage() {
                   <User class="w-3.5 h-3.5" /> Edit Profile
                 </button>
                 <button 
-                  onClick={() => toast.success('Password update placeholder triggered')}
+                  onClick={() => setIsPasswordModalOpen(true)}
                   class="w-full bg-slate-50 hover:bg-slate-100 border text-[#111827] font-extrabold py-2.5 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
                 >
                   <Lock class="w-3.5 h-3.5" /> Change Password
@@ -266,6 +268,11 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+      />
     </div>
   );
 }
