@@ -6,7 +6,6 @@ import api from '../services/api.js';
 import productService from '../services/productService.js';
 import orderService from '../services/orderService.js';
 
-
 // Sub-components
 import StatusBadge from '../components/StatusBadge.jsx';
 import ProductCard from '../components/ProductCard.jsx';
@@ -14,7 +13,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 
 // Icons
 import { 
-  Sparkles, ShoppingBag, ShoppingCart, ShieldAlert, Truck, 
+  ShoppingBag, ShoppingCart, ShieldAlert, Truck, 
   MapPin, Phone, CheckSquare, PlusCircle, BarChart3, 
   Users, Activity, CheckCircle, RefreshCw, Power, Star, ChevronRight,
   Package, UserCheck, XCircle, Compass, DollarSign, Ban, Trash2
@@ -88,8 +87,14 @@ function CustomerDashboard() {
       <div class="bg-white border border-[#E5E7EB] rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-soft">
         <div class="space-y-1">
           <h2 class="text-2xl font-black text-[#111827]">Welcome back, {user?.name}! 👋</h2>
-          <p class="text-xs text-[#6B7280] font-semibold">Ready to cook something delicious? Explore our fresh products.</p>
+          <p class="text-xs text-[#6B7280] font-semibold">Browse our products and order your fresh groceries now!</p>
         </div>
+        <button 
+          onClick={() => navigate('/products')}
+          class="bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-extrabold px-5 py-3 rounded-xl transition-all shadow-sm shadow-[#22C55E]/10 uppercase tracking-wider flex items-center gap-2"
+        >
+          Browse Products <ShoppingBag class="w-4 h-4" />
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -174,7 +179,7 @@ function CustomerDashboard() {
    ADMIN SUB-DASHBOARD
    ============================================================================ */
 function AdminDashboardView() {
-  const [activeTab, setActiveTab] = useState('analytics'); // analytics, users, agents, orders, products, ai-logs
+  const [activeTab, setActiveTab] = useState('analytics'); // analytics, users, agents, orders, products
   const [stats, setStats] = useState({ revenue: 0, activeOrders: 0, totalProducts: 0, totalAgents: 0 });
   const [analytics, setAnalytics] = useState({
     totalOrders: 0,
@@ -206,15 +211,17 @@ function AdminDashboardView() {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        const [prodRes, orderRes, usersRes, analyticsRes] = await Promise.all([
+        const [prodRes, orderRes, agentRes, usersRes, analyticsRes] = await Promise.all([
           productService.getProducts(),
           orderService.getOrders(),
+          orderService.getAgents(),
           api.get('/api/admin/users'),
           api.get('/api/admin/analytics')
         ]);
 
         if (prodRes.success) setProducts(prodRes.products || []);
         if (orderRes.success) setOrders(orderRes.orders || []);
+        if (agentRes.success) setAgents(agentRes.agents || []);
         if (usersRes.data.success) setUsers(usersRes.data.users || []);
         if (analyticsRes.data.success) setAnalytics(analyticsRes.data.analytics);
 
@@ -548,6 +555,10 @@ function AdminDashboardView() {
         </div>
       )}
 
+
+    </div>
+  );
+}
 
     </div>
   );

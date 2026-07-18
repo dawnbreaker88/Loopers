@@ -8,7 +8,9 @@ import {
   addAddress,
   updateAddress,
   deleteAddress,
-  updateUserLocation
+  updateUserLocation,
+  updateUserProfile,
+  changePassword
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -19,6 +21,8 @@ router.post('/login', loginUser);
 router.post('/google', googleLogin);
 router.post('/logout', protect, logoutUser);
 router.get('/profile', protect, getUserProfile);
+router.put('/profile', protect, updateUserProfile);
+router.put('/change-password', protect, changePassword);
 router.post('/address', protect, addAddress);
 router.put('/address/:addressId', protect, updateAddress);
 router.delete('/address/:addressId', protect, deleteAddress);

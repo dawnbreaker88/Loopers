@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
-import { Mail, Lock, User, Phone, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Phone, ShoppingBag } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function SignupPage() {
@@ -148,12 +148,12 @@ export default function SignupPage() {
       {/* Platform Title */}
       <div class="text-center mb-6 flex flex-col items-center">
         <div class="flex items-center gap-2 mb-1.5">
-          <Sparkles class="w-6 h-6 text-[#22C55E]" />
+          <ShoppingBag class="w-6 h-6 text-[#22C55E]" />
           <h1 class="text-3xl font-black text-[#111827] tracking-tight">
             InstaDispatch
           </h1>
         </div>
-        <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">AI-Powered Smart Shopping & Hyperlocal Delivery</p>
+        <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">Hyperlocal Grocery & Delivery Services</p>
       </div>
 
       {/* Signup Card */}

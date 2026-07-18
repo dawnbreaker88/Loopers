@@ -117,27 +117,6 @@ POST http://localhost:5000/api/auth/logout
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzJiMDgxOTcxOWQ0YTc2MWZiNWU1OSIsInJvbGUiOiJjdXN0b21lciIsImVtYWlsIjoiZ29vZ2xldXNlckBnbWFpbC5jb20iLCJpYXQiOjE3ODE3MDY4ODEsImV4cCI6MTc4MTc5MzI4MX0.6GKZXCJDHhpV8HokptPQAKzdT-YszLERDpvB0jHGskc
 
 
-### ============================================================================
-### MODULE 2: AI SMART SEARCH & SHOPPING ASSISTANT
-### ============================================================================
-
-### 1. Process AI Prompt (Protected)
-# Purpose: Parse natural language prompt into scaled ingredients and match with store products
-# Expected Response: 200 OK containing parsed dish name, scaled quantities, and matched database products
-# Note: If GEMINI_API_KEY is not configured in .env, this falls back to a rule-based parser automatically.
-POST http://localhost:5000/api/ai/search
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzJiMDgxOTcxOWQ0YTc2MWZiNWU1OSIsInJvbGUiOiJjdXN0b21lciIsImVtYWlsIjoiZ29vZ2xldXNlckBnbWFpbC5jb20iLCJpYXQiOjE3ODE3MDY4ODEsImV4cCI6MTc4MTc5MzI4MX0.6GKZXCJDHhpV8HokptPQAKzdT-YszLERDpvB0jHGskc
-Content-Type: application/json
-
-{
-  "prompt": "I want to make Chicken Biryani for 4 people tonight"
-}
-
-### 2. Get AI Search History (Protected)
-# Purpose: Fetch all natural language prompts run by the logged-in customer
-# Expected Response: 200 OK with list of past queries and their creation timestamps
-GET http://localhost:5000/api/ai/history
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzJiMDgxOTcxOWQ0YTc2MWZiNWU1OSIsInJvbGUiOiJjdXN0b21lciIsImVtYWlsIjoiZ29vZ2xldXNlckBnbWFpbC5jb20iLCJpYXQiOjE3ODE3MDY4ODEsImV4cCI6MTc4MTc5MzI4MX0.6GKZXCJDHhpV8HokptPQAKzdT-YszLERDpvB0jHGskc
 
 
 ### ============================================================================
@@ -222,7 +201,7 @@ Content-Type: application/json
 }
 
 ### 3. Bulk Add Items to Cart (Protected)
-# Purpose: Bulk insert multiple items into the cart (e.g. from AI Shopping Assistant suggestions)
+# Purpose: Bulk insert multiple items into the cart (e.g. from recipe suggestions or bulk lists)
 # Expected Response: 200 OK with updated cart items and recalculated total price
 POST http://localhost:5000/api/cart/add
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMzJiMDgxOTcxOWQ0YTc2MWZiNWU1OSIsInJvbGUiOiJjdXN0b21lciIsImVtYWlsIjoiZ29vZ2xldXNlckBnbWFpbC5jb20iLCJpYXQiOjE3ODE3MDY4ODEsImV4cCI6MTc4MTc5MzI4MX0.6GKZXCJDHhpV8HokptPQAKzdT-YszLERDpvB0jHGskc

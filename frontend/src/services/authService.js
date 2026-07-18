@@ -39,6 +39,16 @@ export const authService = {
   deleteAddress: async (addressId) => {
     const response = await api.delete(`/api/auth/address/${addressId}`);
     return response.data;
+  },
+  
+  updateProfile: async (profileData) => {
+    const response = await api.put('/api/auth/profile', profileData);
+    return response.data;
+  },
+
+  changePassword: async (passwordData) => {
+    const response = await api.put('/api/auth/change-password', passwordData);
+    return response.data;
   }
 };
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
-import { Sparkles, Compass, ShieldCheck, MapPin, ListPlus } from 'lucide-react';
+import { Compass, ShieldCheck, MapPin, ListPlus, ShoppingBag } from 'lucide-react';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -9,7 +9,7 @@ export default function LandingPage() {
 
   const handleStartShopping = () => {
     if (isAuthenticated) {
-      navigate('/ai-search');
+      navigate('/products');
     } else {
       navigate('/login');
     }
@@ -24,21 +24,21 @@ export default function LandingPage() {
       {/* Hero Section */}
       <div class="text-center max-w-3xl mx-auto space-y-6 pt-8">
         <div class="inline-flex items-center gap-2 bg-[#22C55E]/10 border border-[#22C55E]/20 text-[#22C55E] px-4.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider">
-          <Sparkles class="w-3.5 h-3.5" /> AI-Powered Grocery Assistant
+          ⚡ Lightning Fast Hyperlocal Grocery Delivery
         </div>
         <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-[#111827] tracking-tight leading-tight sm:leading-none">
-          Describe what you need.<br/>
-          <span class="text-[#22C55E]">Let AI build your shopping list.</span>
+          Fresh groceries.<br/>
+          <span class="text-[#22C55E]">Delivered to your doorstep in minutes.</span>
         </h1>
         <p class="text-sm sm:text-md text-[#6B7280] font-semibold leading-relaxed max-w-2xl mx-auto">
-          From recipes to party supplies, type what you are cooking or preparing. Our AI smart search automatically detects ingredient proportions and populates your cart in seconds.
+          Order fresh fruits, vegetables, dairy, bakery products, snacks, and daily essentials from your nearest dark store. Enjoy quick delivery and premium service.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
           <button 
             onClick={handleStartShopping}
             class="w-full sm:w-auto bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold text-sm px-8 py-3.5 rounded-xl transition-all shadow-md shadow-[#22C55E]/20 uppercase tracking-wider flex items-center justify-center gap-2"
           >
-            Start AI Shopping <Sparkles class="w-4 h-4" />
+            Start Shopping <ShoppingBag class="w-4 h-4" />
           </button>
           <button 
             onClick={handleExplore}
@@ -59,11 +59,11 @@ export default function LandingPage() {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div class="bg-white border border-[#E5E7EB] p-6 rounded-2xl shadow-soft space-y-3">
             <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
-              <Sparkles class="w-5 h-5" />
+              <ShoppingBag class="w-5 h-5" />
             </div>
-            <h3 class="font-extrabold text-[#111827] text-md">AI Prompt Shopping</h3>
+            <h3 class="font-extrabold text-[#111827] text-md">Fresh Groceries</h3>
             <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              Describe your needs naturally, like "biryani ingredients for 5 friends," and let our AI compile the items.
+              Choose from a curated local selection of handpicked fresh fruits, premium vegetables, and pantry items.
             </p>
           </div>
 
@@ -71,9 +71,9 @@ export default function LandingPage() {
             <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
               <ListPlus class="w-5 h-5" />
             </div>
-            <h3 class="font-extrabold text-[#111827] text-md">Smart Scaling</h3>
+            <h3 class="font-extrabold text-[#111827] text-md">Easy Ordering</h3>
             <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              AI automatically estimates proportions and brand tiers, matching your recipes to catalog inventory items.
+              Easily customize item quantities, add/remove items in your cart, and checkout with single-click simplicity.
             </p>
           </div>
 
@@ -102,27 +102,27 @@ export default function LandingPage() {
       {/* How it Works Section */}
       <div class="bg-white border border-[#E5E7EB] rounded-3xl p-8 md:p-12 shadow-soft space-y-8">
         <div class="text-center space-y-2">
-          <h2 class="text-2xl font-black text-[#111827]">How InstaDispatch Works</h2>
+          <h2 class="text-2xl font-black text-[#111827]">How Loopers Works</h2>
           <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">Five simple steps to lightning fast checkout</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-5 gap-6 text-center relative">
           <div class="space-y-2 relative">
             <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">1</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Describe Details</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Type your recipe prompt or meal requirements.</p>
+            <h4 class="font-extrabold text-[#111827] text-sm">Explore Catalog</h4>
+            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Browse through categories or search for specific items.</p>
           </div>
           
           <div class="space-y-2">
             <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">2</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">AI Generates List</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">AI compiles required quantities and stock items.</p>
+            <h4 class="font-extrabold text-[#111827] text-sm">Add to Cart</h4>
+            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Select items and adjust quantities directly to your cart.</p>
           </div>
 
           <div class="space-y-2">
             <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">3</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Review Cart</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Adjust quantities, brand suggestions, and defaults.</p>
+            <h4 class="font-extrabold text-[#111827] text-sm">Confirm Order</h4>
+            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Review your cart details and select a delivery address.</p>
           </div>
 
           <div class="space-y-2">

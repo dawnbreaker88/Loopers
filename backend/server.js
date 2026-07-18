@@ -8,7 +8,6 @@ import connectDB from './config/db.js';
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -17,7 +16,6 @@ dotenv.config();
 
 // Connect Database
 connectDB();
-
 
 const app = express();
 const server = http.createServer(app);
@@ -45,7 +43,6 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
-
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);

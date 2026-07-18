@@ -15,7 +15,6 @@ import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-
 import ProductResultsPage from './pages/ProductResultsPage.jsx';
 import CartPage from './pages/CartPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
@@ -66,66 +65,65 @@ function AppContent() {
             <Route path="/products" element={<ProductResultsPage />} />
 
             {/* Protected Multi-Role Dashboard */}
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <DashboardPage />
                 </ProtectedRoute>
-              } 
+              }
             />
 
             {/* Protected Customer Routes */}
-
-            <Route 
-              path="/cart" 
+            <Route
+              path="/cart"
               element={
                 <ProtectedRoute allowedRoles={['customer']}>
                   <CartPage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/checkout" 
+            <Route
+              path="/checkout"
               element={
                 <ProtectedRoute allowedRoles={['customer']}>
                   <CheckoutPage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/payment" 
+            <Route
+              path="/payment"
               element={
                 <ProtectedRoute allowedRoles={['customer']}>
                   <PaymentPage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/orders" 
+            <Route
+              path="/orders"
               element={
                 <ProtectedRoute allowedRoles={['customer']}>
                   <OrdersPage />
                 </ProtectedRoute>
-              } 
+              }
             />
 
             {/* Protected General User Routes */}
-            <Route 
-              path="/tracking/:orderId" 
+            <Route
+              path="/tracking/:orderId"
               element={
                 <ProtectedRoute>
                   <OrderTrackingPage />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/profile" 
+            <Route
+              path="/profile"
               element={
                 <ProtectedRoute>
                   <ProfilePage />
                 </ProtectedRoute>
-              } 
+              }
             />
 
             {/* Admin Dedicated Routes */}
@@ -148,7 +146,7 @@ function AppContent() {
         </main>
         <Footer />
       </div>
-      <Toaster 
+      <Toaster
         position="top-center"
         toastOptions={{
           style: {

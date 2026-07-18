@@ -15,7 +15,13 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/dashboard" replace />;
+    // Redirect role-mismatched users to their default dashboard
+    const defaultRedirect = user.role === 'admin' 
+      ? '/admin' 
+      : user.role === 'delivery_agent' 
+        ? '/agent' 
+        : '/dashboard';
+    return <Navigate to={defaultRedirect} replace />;
   }
 
   return children;

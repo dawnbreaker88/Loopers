@@ -1,5 +1,5 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { loginSuccess, logout, loadUserProfile, addUserAddress, updateUserAddress, deleteUserAddress } from '../store/authSlice.js';
+import { loginSuccess, logout, loadUserProfile, addUserAddress, updateUserAddress, deleteUserAddress, updateUserProfileThunk } from '../store/authSlice.js';
 import authService from '../services/authService.js';
 
 export const useAuth = () => {
@@ -50,6 +50,10 @@ export const useAuth = () => {
     return dispatch(loadUserProfile(tokenStr));
   };
 
+  const updateProfile = (profileData) => {
+    return dispatch(updateUserProfileThunk(profileData));
+  };
+
   return {
     user,
     token,
@@ -64,6 +68,7 @@ export const useAuth = () => {
     updateAddress,
     deleteAddress,
     verifyToken,
+    updateProfile,
     isAdmin: user?.role === 'admin',
     isCustomer: user?.role === 'customer' || !user?.role,
   };
