@@ -69,6 +69,22 @@ export const deleteUserAddress = createAsyncThunk(
   }
 );
 
+// Thunk to update user profile
+export const updateUserProfileThunk = createAsyncThunk(
+  'auth/updateProfile',
+  async (profileData, { rejectWithValue }) => {
+    try {
+      const data = await authService.updateProfile(profileData);
+      if (data.success) {
+        return data.user;
+      }
+      return rejectWithValue('Failed to update profile');
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Error updating profile');
+    }
+  }
+);
+
 const tokenFromStorage = localStorage.getItem('token') || '';
 
 const initialState = {
@@ -150,6 +166,12 @@ const authSlice = createSlice({
       .addCase(deleteUserAddress.fulfilled, (state, action) => {
         if (state.user) {
           state.user.addresses = action.payload;
+        }
+      })
+      .addCase(updateUserProfileThunk.fulfilled, (state, action) => {
+        if (state.user && action.payload) {
+          state.user.name = action.payload.name;
+          state.user.phone = action.payload.phone;
         }
       });
   }
