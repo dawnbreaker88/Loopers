@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const { loginUser, loginWithGoogle } = useAuth();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -69,14 +69,14 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error('Please enter email and password');
+    if (!identifier || !password) {
+      toast.error('Please enter email/phone and password');
       return;
     }
 
     setSubmitting(true);
     try {
-      const data = await loginUser({ email, password });
+      const data = await loginUser({ identifier, password });
       if (data.success) {
         toast.success(`Welcome back, ${data.user.name}!`);
         // Redirect to dashboard (DashboardPage handles role routing)
@@ -151,17 +151,17 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} class="space-y-4">
-          {/* Email */}
+          {/* Email / Phone */}
           <div class="space-y-1">
-            <label class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider pl-0.5">Email address</label>
+            <label class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider pl-0.5">Email or Phone</label>
             <div class="relative">
               <Mail class="absolute left-3 top-3 w-4.5 h-4.5 text-[#6B7280]" />
               <input 
-                type="email"
+                type="text"
                 required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com or 9876543210"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 disabled={submitting}
                 class="w-full border border-[#E5E7EB] focus:border-[#22C55E] text-xs font-semibold rounded-xl py-3 pl-10 pr-4 focus:outline-none disabled:opacity-60"
               />
@@ -245,27 +245,20 @@ export default function LoginPage() {
             <span>Sandbox Quick Accounts</span>
           </div>
           
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <button 
               type="button"
               onClick={() => handleQuickLogin('user@delivery.com', 'user12345', 'Customer')}
               class="text-[10px] font-bold bg-[#F8FAFC] hover:bg-[#22C55E]/5 text-[#6B7280] hover:text-[#22C55E] border border-[#E5E7EB] hover:border-[#22C55E]/20 py-2.5 rounded-lg transition-all"
             >
-              Customer
+              Customer Demo
             </button>
             <button 
               type="button"
-              onClick={() => handleQuickLogin('rahul@delivery.com', 'agent12345', 'Agent')}
+              onClick={() => handleQuickLogin('cp@gmail.com', 'camperprabs', 'Admin')}
               class="text-[10px] font-bold bg-[#F8FAFC] hover:bg-[#22C55E]/5 text-[#6B7280] hover:text-[#22C55E] border border-[#E5E7EB] hover:border-[#22C55E]/20 py-2.5 rounded-lg transition-all"
             >
-              Agent
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleQuickLogin('admin@delivery.com', 'admin12345', 'Admin')}
-              class="text-[10px] font-bold bg-[#F8FAFC] hover:bg-[#22C55E]/5 text-[#6B7280] hover:text-[#22C55E] border border-[#E5E7EB] hover:border-[#22C55E]/20 py-2.5 rounded-lg transition-all"
-            >
-              Admin
+              Admin Demo
             </button>
           </div>
         </div>

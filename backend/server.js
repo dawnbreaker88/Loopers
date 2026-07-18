@@ -8,20 +8,16 @@ import connectDB from './config/db.js';
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
+
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
-import dispatchRoutes from './routes/dispatchRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-
-// Dispatcher IO initialization
-import { setIoInstance } from './services/dispatchService.js';
 
 dotenv.config();
 
 // Connect Database
 connectDB();
-console.log('Environment check: GEMINI_API_KEY is', process.env.GEMINI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED');
+
 
 const app = express();
 const server = http.createServer(app);
@@ -34,8 +30,8 @@ const io = new Server(server, {
   }
 });
 
-// Pass socket.io instance to the dispatch service
-setIoInstance(io);
+// Make io accessible to controllers
+app.set('socketio', io);
 
 // Middleware
 app.use(cors());
@@ -49,10 +45,9 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/ai', aiRoutes);
+
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Socket.io Real-Time Event Handlers
@@ -65,6 +60,12 @@ io.on('connection', (socket) => {
       socket.join(userId);
       console.log(`User socket ${socket.id} joined room: ${userId}`);
     }
+  });
+
+  // Join Admin Room (for real-time order notifications and management)
+  socket.on('join-admin-room', () => {
+    socket.join('admin');
+    console.log(`Admin socket ${socket.id} joined admin room`);
   });
 
   // Join Order Room (for agent tracking updates on specific orders)

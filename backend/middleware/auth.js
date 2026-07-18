@@ -57,11 +57,4 @@ export const isAdmin = (req, res, next) => {
   }
 };
 
-// Agent role check
-export const isAgent = (req, res, next) => {
-  if (req.user && (req.user.role === 'delivery_agent' || req.user.role === 'admin')) {
-    next();
-  } else {
-    res.status(403).json({ success: false, message: 'Forbidden, delivery agent access only' });
-  }
-};
+

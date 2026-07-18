@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
-import DeliveryAgent from '../models/DeliveryAgent.js';
 
 dotenv.config();
 
@@ -653,15 +652,14 @@ const products = [
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/hyperlocal-dispatcher');
+    await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/hyperlocal-dispatcher');
     console.log('Connected to MongoDB for Seeding...');
 
     // Clear existing data
     await Product.deleteMany({});
     await User.deleteMany({});
-    await DeliveryAgent.deleteMany({});
 
-    console.log('Cleared existing data (Users, Products, DeliveryAgents)');
+    console.log('Cleared existing data (Users, Products)');
 
     const generateProducts = () => {
       const categories = {
@@ -736,6 +734,24 @@ const seedDatabase = async () => {
     });
     console.log('Admin User created (email: admin@delivery.com, password: admin12345)');
 
+    const camperUser = await User.create({
+      name: 'Camper Admin',
+      email: 'cp@gmail.com',
+      phone: '8888888888',
+      password: 'camperprabs',
+      role: 'admin'
+    });
+    console.log('Camper Admin created (email: cp@gmail.com, password: camperprabs)');
+
+    const airaaUser = await User.create({
+      name: 'System Admin',
+      email: 'airaareddy@gmail.com',
+      phone: '7777777777',
+      password: 'airaareddy123',
+      role: 'admin'
+    });
+    console.log('System Admin created (email: airaareddy@gmail.com, password: airaareddy123)');
+
     // Create Test Customer User
     const customerUser = await User.create({
       name: 'John Doe',
@@ -758,72 +774,6 @@ const seedDatabase = async () => {
       ]
     });
     console.log('Customer User created (email: user@delivery.com, password: user12345)');
-
-    // Create Delivery Agent Users & Agent Documents
-    // Agent 1: Rahul Kumar (Located close to Indiranagar)
-    const userAgent1 = await User.create({
-      name: 'Rahul Kumar',
-      email: 'rahul@delivery.com',
-      phone: '9876543210',
-      password: 'agent12345',
-      role: 'delivery_agent'
-    });
-    const agent1 = await DeliveryAgent.create({
-      user: userAgent1._id,
-      name: userAgent1.name,
-      email: userAgent1.email,
-      phone: userAgent1.phone,
-      currentLocation: { lat: 12.9780, lng: 77.6400 }, // Close to Indiranagar
-      isAvailable: true,
-      isOnline: true,
-      approvalStatus: 'approved',
-      rating: 4.8,
-      ratingsCount: 15
-    });
-
-    // Agent 2: Amit Singh (Located slightly further)
-    const userAgent2 = await User.create({
-      name: 'Amit Singh',
-      email: 'amit@delivery.com',
-      phone: '9876543211',
-      password: 'agent12345',
-      role: 'delivery_agent'
-    });
-    const agent2 = await DeliveryAgent.create({
-      user: userAgent2._id,
-      name: userAgent2.name,
-      email: userAgent2.email,
-      phone: userAgent2.phone,
-      currentLocation: { lat: 12.9650, lng: 77.6200 }, // Slightly further
-      isAvailable: true,
-      isOnline: true,
-      approvalStatus: 'approved',
-      rating: 4.6,
-      ratingsCount: 8
-    });
-
-    // Agent 3: Vikram Malhotra (Unavailable agent)
-    const userAgent3 = await User.create({
-      name: 'Vikram Malhotra',
-      email: 'vikram@delivery.com',
-      phone: '9876543212',
-      password: 'agent12345',
-      role: 'delivery_agent'
-    });
-    const agent3 = await DeliveryAgent.create({
-      user: userAgent3._id,
-      name: userAgent3.name,
-      email: userAgent3.email,
-      phone: userAgent3.phone,
-      currentLocation: { lat: 12.9820, lng: 77.6500 },
-      isAvailable: false,
-      isOnline: false,
-      approvalStatus: 'pending',
-      rating: 4.9,
-      ratingsCount: 20
-    });
-
-    console.log(`Seeded 3 Delivery Agents and corresponding User logins! (Rahul, Amit, Vikram; passwords: agent12345)`);
 
     console.log('Seeding completed successfully! Exiting...');
     process.exit(0);

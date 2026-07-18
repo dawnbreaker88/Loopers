@@ -1,8 +1,6 @@
 import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
 import Product from '../models/Product.js';
-import DeliveryAgent from '../models/DeliveryAgent.js';
-import { assignNearestAgent } from '../services/dispatchService.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // @desc    Create a new order from cart
@@ -66,8 +64,7 @@ export const createOrder = async (req, res) => {
     }
 
     // Calculate distance and delivery charge
-    const { calculateDistance } = await import('../services/dispatchService.js');
-    const distance = calculateDistance(storeLat, storeLng, customerLat, customerLng);
+    const distance = Math.sqrt(Math.pow((storeLat - customerLat), 2) + Math.pow((storeLng - customerLng), 2)) * 111;
     const deliveryCharge = parseFloat((distance * 4).toFixed(2));
     const finalTotalPrice = parseFloat((cart.totalPrice + deliveryCharge).toFixed(2));
 
@@ -84,14 +81,14 @@ export const createOrder = async (req, res) => {
       paymentMethod,
       paymentStatus,
       paymentId: simulatedPaymentId,
-      orderStatus: 'Order Confirmed',
+      orderStatus: 'Placed',
       storeLocation: { lat: storeLat, lng: storeLng },
       customerLocation: { lat: customerLat, lng: customerLng },
       distance: parseFloat(distance.toFixed(2)),
       deliveryCharge,
       trackingHistory: [
         {
-          status: 'Order Confirmed',
+          status: 'Placed',
           lat: storeLat,
           lng: storeLng,
           timestamp: new Date()
@@ -106,8 +103,14 @@ export const createOrder = async (req, res) => {
 
     console.log(`Order created successfully: ${order._id}`);
 
-    // Trigger dispatcher agent assignment asynchronously
-    assignNearestAgent(order._id);
+    // Populate user details for real-time admin view
+    await order.populate('user', 'name email phone');
+
+    // Emit socket event to admin room
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to('admin').emit('orderCreated', order);
+    }
 
     return res.status(201).json({
       success: true,
@@ -129,16 +132,10 @@ export const getOrders = async (req, res) => {
 
     if (req.user.role === 'admin') {
       // Admin gets all orders
-      orders = await Order.find({}).populate('user', 'name email').populate('deliveryAgent').sort({ createdAt: -1 });
-    } else if (req.user.role === 'delivery_agent') {
-      // Find the agent record first
-      const agent = await DeliveryAgent.findOne({ user: req.user._id });
-      if (agent) {
-        orders = await Order.find({ deliveryAgent: agent._id }).populate('user', 'name email phone').sort({ createdAt: -1 });
-      }
+      orders = await Order.find({}).populate('user', 'name email').sort({ createdAt: -1 });
     } else {
       // Customer gets their own orders
-      orders = await Order.find({ user: req.user._id }).populate('deliveryAgent').sort({ createdAt: -1 });
+      orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
     }
 
     return res.json({ success: true, count: orders.length, orders });
@@ -154,26 +151,17 @@ export const getOrders = async (req, res) => {
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('user', 'name email phone')
-      .populate('deliveryAgent');
+      .populate('user', 'name email phone');
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Check authorization: only the order placing customer, assigned agent, or admin can read it
+    // Check authorization: only the order placing customer or admin can read it
     const isCustomer = order.user._id.toString() === req.user._id.toString();
     const isAdminUser = req.user.role === 'admin';
     
-    let isAssignedAgent = false;
-    if (req.user.role === 'delivery_agent' && order.deliveryAgent) {
-      const agent = await DeliveryAgent.findOne({ user: req.user._id });
-      if (agent && order.deliveryAgent._id.toString() === agent._id.toString()) {
-        isAssignedAgent = true;
-      }
-    }
-
-    if (!isCustomer && !isAdminUser && !isAssignedAgent) {
+    if (!isCustomer && !isAdminUser) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this order' });
     }
 
@@ -191,7 +179,7 @@ export const cancelOrder = async (req, res) => {
   const { orderId } = req.body;
 
   try {
-    const order = await Order.findById(orderId).populate('deliveryAgent');
+    const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -202,7 +190,7 @@ export const cancelOrder = async (req, res) => {
     }
 
     // Check if order can be cancelled (Only in early stages)
-    const nonCancellable = ['Picked Up', 'On The Way', 'Near You', 'Delivered', 'Cancelled'];
+    const nonCancellable = ['Packed', 'Out For Delivery', 'Delivered', 'Completed', 'Cancelled'];
     if (nonCancellable.includes(order.orderStatus)) {
       return res.status(400).json({ 
         success: false, 
@@ -219,18 +207,22 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    // Release delivery agent if assigned
-    if (order.deliveryAgent) {
-      const agent = await DeliveryAgent.findById(order.deliveryAgent._id);
-      if (agent) {
-        agent.isAvailable = true;
-        await agent.save();
-      }
-    }
+    // No delivery agent to release
 
     order.orderStatus = 'Cancelled';
     order.paymentStatus = order.paymentStatus === 'Completed' ? 'Refunded' : order.paymentStatus;
     await order.save();
+
+    await order.populate('user', 'name email phone');
+
+    // Emit socket event to admin and user rooms
+    const io = req.app.get('socketio');
+    if (io) {
+      const userRoom = order.user._id ? order.user._id.toString() : order.user.toString();
+      io.to('admin').emit('orderUpdated', order);
+      io.to(userRoom).emit('orderUpdated', order);
+      io.to(userRoom).emit('orderCancelled', order);
+    }
 
     console.log(`Order cancelled successfully: ${orderId}`);
 
@@ -245,7 +237,7 @@ export const cancelOrder = async (req, res) => {
 // @route   POST /api/orders/:id/rate
 // @access  Private
 export const rateOrder = async (req, res) => {
-  const { agentRating, agentReview, experienceRating } = req.body;
+  const { experienceRating } = req.body;
 
   try {
     const order = await Order.findById(req.params.id);
@@ -258,27 +250,9 @@ export const rateOrder = async (req, res) => {
     }
 
     order.ratings = {
-      agentRating,
-      agentReview,
       experienceRating
     };
     await order.save();
-
-    // If rated agent, update agent cumulative rating
-    if (order.deliveryAgent && agentRating) {
-      const agent = await DeliveryAgent.findById(order.deliveryAgent);
-      if (agent) {
-        const currentCount = agent.ratingsCount || 0;
-        const currentRating = agent.rating || 5.0;
-        
-        const newCount = currentCount + 1;
-        const newRating = ((currentRating * currentCount) + agentRating) / newCount;
-
-        agent.ratingsCount = newCount;
-        agent.rating = Math.round(newRating * 10) / 10;
-        await agent.save();
-      }
-    }
 
     return res.json({ success: true, message: 'Ratings saved successfully', order });
   } catch (error) {

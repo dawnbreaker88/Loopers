@@ -220,19 +220,7 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Role selection */}
-          <div class="space-y-1">
-            <label class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider pl-0.5">Register as</label>
-            <select 
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              disabled={submitting}
-              class="w-full border border-[#E5E7EB] focus:border-[#22C55E] text-xs font-semibold rounded-xl py-3 px-4 focus:outline-none disabled:opacity-60 bg-white"
-            >
-              <option value="customer">Customer (Buy groceries)</option>
-              <option value="delivery_agent">Delivery Agent (Rider dispatcher)</option>
-            </select>
-          </div>
+
 
           {/* Password */}
           <div class="space-y-1">

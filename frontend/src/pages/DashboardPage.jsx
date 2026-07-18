@@ -5,7 +5,7 @@ import { useCart } from '../hooks/useCart.js';
 import api from '../services/api.js';
 import productService from '../services/productService.js';
 import orderService from '../services/orderService.js';
-import aiService from '../services/aiService.js';
+
 
 // Sub-components
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -88,14 +88,8 @@ function CustomerDashboard() {
       <div class="bg-white border border-[#E5E7EB] rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-soft">
         <div class="space-y-1">
           <h2 class="text-2xl font-black text-[#111827]">Welcome back, {user?.name}! 👋</h2>
-          <p class="text-xs text-[#6B7280] font-semibold">Ready to cook something delicious? Try our AI Smart Assistant.</p>
+          <p class="text-xs text-[#6B7280] font-semibold">Ready to cook something delicious? Explore our fresh products.</p>
         </div>
-        <button 
-          onClick={() => navigate('/ai-search')}
-          class="bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-extrabold px-5 py-3 rounded-xl transition-all shadow-sm shadow-[#22C55E]/10 uppercase tracking-wider flex items-center gap-2"
-        >
-          AI Smart Assistant <Sparkles class="w-4 h-4" />
-        </button>
       </div>
 
       {/* Stats Cards */}
@@ -187,14 +181,11 @@ function AdminDashboardView() {
     activeOrders: 0,
     completedOrders: 0,
     revenue: 0,
-    deliveryCharges: 0,
-    agentEarnings: 0
+    deliveryCharges: 0
   });
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [agents, setAgents] = useState([]);
   const [users, setUsers] = useState([]);
-  const [aiLogs, setAiLogs] = useState([]);
   
   // Product Creation
   const [showProductForm, setShowProductForm] = useState(false);
@@ -215,19 +206,15 @@ function AdminDashboardView() {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        const [prodRes, orderRes, agentRes, aiRes, usersRes, analyticsRes] = await Promise.all([
+        const [prodRes, orderRes, usersRes, analyticsRes] = await Promise.all([
           productService.getProducts(),
           orderService.getOrders(),
-          orderService.getAgents(),
-          aiService.getHistory(),
           api.get('/api/admin/users'),
           api.get('/api/admin/analytics')
         ]);
 
         if (prodRes.success) setProducts(prodRes.products || []);
         if (orderRes.success) setOrders(orderRes.orders || []);
-        if (agentRes.success) setAgents(agentRes.agents || []);
-        if (aiRes.success) setAiLogs(aiRes.history || []);
         if (usersRes.data.success) setUsers(usersRes.data.users || []);
         if (analyticsRes.data.success) setAnalytics(analyticsRes.data.analytics);
 
@@ -239,8 +226,7 @@ function AdminDashboardView() {
         setStats({
           revenue: Math.round(totalRevenue),
           activeOrders: active.length,
-          totalProducts: prodRes.products?.length || 0,
-          totalAgents: agentRes.agents?.length || 0
+          totalProducts: prodRes.products?.length || 0
         });
       } catch (err) {
         console.error('Error loading admin data', err);
@@ -263,17 +249,7 @@ function AdminDashboardView() {
     }
   };
 
-  const handleUpdateAgentStatus = async (agentId, approvalStatus, isActive) => {
-    try {
-      const res = await api.put(`/api/admin/agents/${agentId}/status`, { approvalStatus, isActive });
-      if (res.data.success) {
-        toast.success(`Agent status updated to ${approvalStatus}`);
-        setRefreshTrigger(prev => prev + 1);
-      }
-    } catch (err) {
-      toast.error('Failed to update agent status');
-    }
-  };
+
 
   const handleCreateProduct = async (e) => {
     e.preventDefault();
@@ -294,15 +270,15 @@ function AdminDashboardView() {
     }
   };
 
-  const handleForceAssign = async (orderId) => {
+  const handleOrderTransition = async (orderId, endpoint) => {
     try {
-      const res = await orderService.assignAgent({ orderId });
-      if (res.success) {
-        toast.success('Auto-allocation algorithm executed');
+      const res = await api.post(`/api/admin/orders/${orderId}/${endpoint}`);
+      if (res.data.success) {
+        toast.success(res.data.message);
         setRefreshTrigger(prev => prev + 1);
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Agent allocation failed');
+      toast.error(err.response?.data?.message || 'Order update failed');
     }
   };
 
@@ -338,8 +314,8 @@ function AdminDashboardView() {
           <p className="text-2xl font-black text-[#111827]">₹{Math.round(analytics.revenue)}</p>
         </div>
         <div className="bg-white border border-[#E5E7EB] p-5 rounded-2xl shadow-soft">
-          <span className="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block mb-1">Rider Earnings / Deliv Charges</span>
-          <p className="text-sm font-black text-[#111827]">₹{analytics.agentEarnings} / ₹{analytics.deliveryCharges}</p>
+          <span className="text-[9px] font-extrabold text-[#6B7280] uppercase tracking-wider block mb-1">Delivery Charges</span>
+          <p className="text-2xl font-black text-[#111827]">₹{analytics.deliveryCharges}</p>
         </div>
       </div>
 
@@ -348,10 +324,8 @@ function AdminDashboardView() {
         {[
           { id: 'analytics', label: 'Dispatcher Hub', icon: Activity },
           { id: 'users', label: 'Users Management', icon: Users },
-          { id: 'agents', label: 'Riders Management', icon: Truck },
           { id: 'products', label: 'Inventory Catalog', icon: Package },
-          { id: 'orders', label: 'Orders Register', icon: CheckCircle },
-          { id: 'ai-logs', label: 'AI Search Logs', icon: Sparkles }
+          { id: 'orders', label: 'Orders Register', icon: CheckCircle }
         ].map(t => (
           <button
             key={t.id}
@@ -366,52 +340,27 @@ function AdminDashboardView() {
 
       {/* Panels */}
       {activeTab === 'analytics' && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          <div className="md:col-span-6 bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
-            <h3 className="font-extrabold text-[#111827] text-md">Delivery Agents Status</h3>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {agents.map((agent, idx) => (
-                <div key={idx} className="p-3 border border-[#E5E7EB] rounded-xl bg-slate-50 flex justify-between items-center text-xs">
-                  <div>
-                    <h4 className="font-bold text-[#111827]">{agent.name}</h4>
-                    <span className="text-[10px] text-[#6B7280] font-semibold block">{agent.phone} • Status: {agent.approvalStatus.toUpperCase()}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${agent.isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {agent.isOnline ? 'Online' : 'Offline'}
-                    </span>
-                    {agent.currentLocation && (
-                      <span className="block text-[9px] text-[#6B7280] font-mono mt-0.5">[{agent.currentLocation.lat.toFixed(4)}, {agent.currentLocation.lng.toFixed(4)}]</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="md:col-span-6 bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
+        <div className="grid grid-cols-1 gap-8">
+          <div className="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
             <h3 className="font-extrabold text-[#111827] text-md">Live Orders Monitor</h3>
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {orders.filter(o => !['Delivered', 'Cancelled'].includes(o.orderStatus)).map((order, idx) => (
+              {orders.filter(o => !['Completed', 'Cancelled'].includes(o.orderStatus)).map((order, idx) => (
                 <div key={idx} className="p-3 border border-[#E5E7EB] rounded-xl bg-slate-50 space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="text-[9px] text-[#6B7280] block font-mono">#{order._id.slice(-8)}</span>
                       <span className="font-black text-[#111827]">₹{order.totalPrice} • {order.products.length} Items</span>
-                      <span className="block text-[10px] text-[#6B7280]">Distance: {order.distance || 0} km • Delivery Charge: ₹{order.deliveryCharge || 0}</span>
                     </div>
                     <StatusBadge status={order.orderStatus} />
                   </div>
                   <div className="flex justify-between items-center border-t border-[#E5E7EB] pt-2">
-                    <span className="text-[10px] text-[#6B7280]">Agent: {order.deliveryAgent ? order.deliveryAgent.name : <span className="text-[#EF4444] font-bold">Unassigned</span>}</span>
-                    {!order.deliveryAgent && (
-                      <button 
-                        onClick={() => handleForceAssign(order._id)}
-                        className="bg-[#22C55E] hover:bg-[#16A34A] text-white text-[10px] font-extrabold px-3 py-1 rounded-md"
-                      >
-                        Auto-Assign
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {order.orderStatus === 'Placed' && <button onClick={() => handleOrderTransition(order._id, 'accept')} className="bg-[#22C55E] text-white px-2 py-1 rounded">Accept</button>}
+                      {order.orderStatus === 'Accepted' && <button onClick={() => handleOrderTransition(order._id, 'pack')} className="bg-[#22C55E] text-white px-2 py-1 rounded">Pack</button>}
+                      {order.orderStatus === 'Packed' && <button onClick={() => handleOrderTransition(order._id, 'out-for-delivery')} className="bg-[#22C55E] text-white px-2 py-1 rounded">Out for Delivery</button>}
+                      {order.orderStatus === 'Out For Delivery' && <button onClick={() => handleOrderTransition(order._id, 'deliver')} className="bg-[#22C55E] text-white px-2 py-1 rounded">Deliver</button>}
+                      <button onClick={() => handleOrderTransition(order._id, 'cancel')} className="bg-rose-500 text-white px-2 py-1 rounded">Cancel</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -479,101 +428,7 @@ function AdminDashboardView() {
         </div>
       )}
 
-      {activeTab === 'agents' && (
-        <div className="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-6">
-          <h3 className="font-extrabold text-[#111827] text-md">Delivery Agents Management</h3>
-          
-          {/* Pending Approval Section */}
-          <div className="space-y-3">
-            <h4 className="font-bold text-sm text-[#EF4444] border-l-4 border-[#EF4444] pl-2">Pending Approval</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {agents.filter(a => a.approvalStatus === 'pending').length === 0 ? (
-                <p className="text-xs text-[#6B7280] italic">No agents pending approval.</p>
-              ) : (
-                agents.filter(a => a.approvalStatus === 'pending').map((a, idx) => (
-                  <div key={idx} className="p-4 border border-[#E5E7EB] bg-slate-50 rounded-2xl flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-bold text-[#111827]">{a.name}</p>
-                      <p className="text-mono text-[#6B7280]">{a.email}</p>
-                      <p className="text-[10px] text-[#6B7280] font-semibold">Phone: {a.phone}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleUpdateAgentStatus(a._id, 'approved', true)}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" /> Approve
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateAgentStatus(a._id, 'rejected', false)}
-                        className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
 
-          {/* Approved Agents Section */}
-          <div className="space-y-3 pt-4 border-t">
-            <h4 className="font-bold text-sm text-[#22C55E] border-l-4 border-[#22C55E] pl-2">Approved Riders</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {agents.filter(a => a.approvalStatus === 'approved').length === 0 ? (
-                <p className="text-xs text-[#6B7280] italic">No approved agents.</p>
-              ) : (
-                agents.filter(a => a.approvalStatus === 'approved').map((a, idx) => (
-                  <div key={idx} className="p-4 border border-[#E5E7EB] bg-slate-50 rounded-2xl flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-bold text-[#111827]">{a.name}</p>
-                      <p className="text-mono text-[#6B7280]">{a.email}</p>
-                      <p className="text-[10px] text-[#6B7280] font-semibold">Phone: {a.phone} • Rating: ★ {a.rating}</p>
-                      <p className="text-[10px] text-[#22C55E] font-extrabold mt-1">Earnings: ₹{a.earnings || 0} • Completed: {a.completedDeliveries || 0}</p>
-                    </div>
-                    <div>
-                      <button 
-                        onClick={() => handleUpdateAgentStatus(a._id, 'rejected', false)}
-                        className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1 border border-rose-200"
-                      >
-                        <Ban className="w-3.5 h-3.5" /> Reject / Ban
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Rejected Agents Section */}
-          <div className="space-y-3 pt-4 border-t">
-            <h4 className="font-bold text-sm text-[#EF4444] border-l-4 border-[#EF4444] pl-2">Rejected Riders</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {agents.filter(a => a.approvalStatus === 'rejected').length === 0 ? (
-                <p className="text-xs text-[#6B7280] italic">No rejected agents.</p>
-              ) : (
-                agents.filter(a => a.approvalStatus === 'rejected').map((a, idx) => (
-                  <div key={idx} className="p-4 border border-[#E5E7EB] bg-slate-50 rounded-2xl flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-bold text-[#111827]">{a.name}</p>
-                      <p className="text-mono text-[#6B7280]">{a.email}</p>
-                    </div>
-                    <div>
-                      <button 
-                        onClick={() => handleUpdateAgentStatus(a._id, 'approved', true)}
-                        className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1 border border-emerald-200"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" /> Approve
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'products' && (
         <div className="space-y-6">
@@ -676,7 +531,6 @@ function AdminDashboardView() {
                   <th className="pb-3 px-2">Customer</th>
                   <th className="pb-3 px-2 text-right">Paid</th>
                   <th className="pb-3 px-2">Status</th>
-                  <th className="pb-3 px-2">Rider</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
@@ -686,7 +540,6 @@ function AdminDashboardView() {
                     <td className="py-3 px-2 font-bold">{ord.user?.name || 'Customer'}</td>
                     <td className="py-3 px-2 text-right font-black text-[#22C55E]">₹{ord.totalPrice}</td>
                     <td className="py-3 px-2"><StatusBadge status={ord.orderStatus} /></td>
-                    <td className="py-3 px-2 text-[#6B7280] font-semibold">{ord.deliveryAgent?.name || 'Unassigned'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -695,352 +548,7 @@ function AdminDashboardView() {
         </div>
       )}
 
-      {activeTab === 'ai-logs' && (
-        <div className="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
-          <h3 className="font-extrabold text-[#111827] text-md">AI Shopping Prompt Audit Logs</h3>
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {aiLogs.length === 0 ? (
-              <p className="text-xs text-[#6B7280] py-6 text-center">No logs logged yet.</p>
-            ) : (
-              aiLogs.map((log, idx) => (
-                <div key={idx} className="p-4 rounded-xl border border-[#E5E7EB] bg-slate-50 space-y-2.5 text-xs text-[#6B7280]">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="font-bold">Query Log</span>
-                    <span>{new Date(log.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="font-bold text-[#111827] italic pl-2 border-l-2 border-[#22C55E]">"{log.prompt}"</p>
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider block mb-1 font-bold">Matched list items</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {log.aiResponse?.ingredients?.map((ing, iIdx) => (
-                        <span key={iIdx} className="text-[10px] bg-white border border-[#E5E7EB] text-[#111827] px-2 py-0.5 rounded-lg">
-                          {ing.ingredientName || ing.product} ({ing.requiredQuantity || ing.quantity})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
-/* ============================================================================
-   DELIVERY AGENT SUB-DASHBOARD
-   ============================================================================ */
-function AgentDashboardView() {
-  const { user } = useAuth();
-  const [agentProfile, setAgentProfile] = useState(null);
-  const [assignedOrders, setAssignedOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [activeRequest, setActiveRequest] = useState(null);
-
-  useEffect(() => {
-    const fetchAgentData = async () => {
-      try {
-        setLoading(true);
-        const [profileRes, ordersRes] = await Promise.all([
-          api.get('/api/dispatch/agent-profile'),
-          orderService.getOrders()
-        ]);
-
-        if (profileRes.data.success) {
-          const profile = profileRes.data.agent;
-          setAgentProfile(profile);
-
-          if (ordersRes.success) {
-            const active = (ordersRes.orders || []).filter(o => 
-              !['Delivered', 'Cancelled'].includes(o.orderStatus) && 
-              o.deliveryAgent && 
-              (o.deliveryAgent._id === profile._id || o.deliveryAgent === profile._id)
-            );
-            setAssignedOrders(active);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching agent data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAgentData();
-  }, [refreshTrigger]);
-
-  useEffect(() => {
-    if (!agentProfile || !agentProfile.isOnline) {
-      setActiveRequest(null);
-      return;
-    }
-
-    const checkActiveRequest = async () => {
-      try {
-        const res = await api.get('/api/dispatch/active-request');
-        if (res.data.success && res.data.activeRequest) {
-          setActiveRequest(res.data.activeRequest);
-        } else {
-          setActiveRequest(null);
-        }
-      } catch (err) {
-        console.error('Error checking active request:', err);
-      }
-    };
-
-    checkActiveRequest();
-    const interval = setInterval(checkActiveRequest, 4000);
-    return () => clearInterval(interval);
-  }, [agentProfile?.isOnline, refreshTrigger]);
-
-  useEffect(() => {
-    if (!user) return;
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin || 'http://localhost:5000';
-    const socket = io(socketUrl);
-    
-    socket.on('connect', () => {
-      socket.emit('join-user-room', user._id || user.id);
-    });
-
-    socket.on('order-assignment-request', (data) => {
-      console.log('Received order-assignment-request via socket:', data);
-      setActiveRequest(data);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [user]);
-
-  const toggleOnline = async () => {
-    if (!agentProfile) return;
-    try {
-      const res = await api.put('/api/dispatch/toggle-online');
-      if (res.data.success) {
-        setAgentProfile(res.data.agent);
-        toast.success(`Rider status set: ${res.data.agent.isOnline ? 'ONLINE' : 'OFFLINE'}`);
-        setRefreshTrigger(prev => prev + 1);
-      }
-    } catch (err) {
-      toast.error('Failed to toggle online status');
-    }
-  };
-
-  const handleAcceptRequest = async () => {
-    if (!activeRequest) return;
-    try {
-      const res = await api.post('/api/dispatch/accept', { orderId: activeRequest.orderId });
-      if (res.data.success) {
-        toast.success('Order accepted successfully!');
-        setActiveRequest(null);
-        setRefreshTrigger(prev => prev + 1);
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to accept order');
-    }
-  };
-
-  const handleRejectRequest = async () => {
-    if (!activeRequest) return;
-    try {
-      const res = await api.post('/api/dispatch/reject', { orderId: activeRequest.orderId });
-      if (res.data.success) {
-        toast.success('Order request rejected');
-        setActiveRequest(null);
-        setRefreshTrigger(prev => prev + 1);
-      }
-    } catch (err) {
-      toast.error('Failed to reject order');
-    }
-  };
-
-  const handleSimulateStatus = async (orderId, currentStatus) => {
-    const orderObj = assignedOrders.find(o => o._id === orderId);
-    if (!orderObj) return;
-
-    let nextStatus = '';
-    const storeLat = orderObj.storeLocation?.lat || 12.9724;
-    const storeLng = orderObj.storeLocation?.lng || 77.5951;
-    const customerCoords = getCoordsFromAddress(orderObj.address);
-    const customerLat = orderObj.customerLocation?.lat || customerCoords.lat;
-    const customerLng = orderObj.customerLocation?.lng || customerCoords.lng;
-    let lat = agentProfile?.currentLocation?.lat, lng = agentProfile?.currentLocation?.lng;
-
-    if (currentStatus === 'Assigned') {
-      nextStatus = 'Preparing'; lat = storeLat; lng = storeLng;
-    } else if (currentStatus === 'Preparing') {
-      nextStatus = 'Picked Up'; lat = storeLat; lng = storeLng;
-    } else if (currentStatus === 'Picked Up') {
-      nextStatus = 'On The Way'; lat = (storeLat + customerLat) / 2; lng = (storeLng + customerLng) / 2;
-    } else if (currentStatus === 'On The Way') {
-      nextStatus = 'Near You'; lat = customerLat - 0.0005; lng = customerLng - 0.0005;
-    } else if (currentStatus === 'Near You') {
-      nextStatus = 'Delivered'; lat = customerLat; lng = customerLng;
-    }
-
-    if (!nextStatus) return;
-
-    try {
-      await orderService.updateAgentLocation({
-        lat, lng, isAvailable: nextStatus === 'Delivered' ? true : false,
-        status: nextStatus, orderId
-      });
-      toast.success(`Order advanced to: ${nextStatus}`);
-      setRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      toast.error('Simulation step failed');
-    }
-  };
-
-  if (loading && refreshTrigger === 0) return <LoadingSpinner message="Loading Rider Console..." />;
-
-  return (
-    <div className="space-y-8 max-w-4xl mx-auto relative">
-      {/* Accept/Reject Popup Notification Modal */}
-      {activeRequest && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 shadow-2xl max-w-md w-full animate-bounce-in space-y-4">
-            <div className="flex items-center gap-2 border-b pb-3 text-rose-500">
-              <ShieldAlert className="w-6 h-6 animate-pulse" />
-              <h3 className="text-lg font-black uppercase tracking-wider">New Dispatch Offer</h3>
-            </div>
-            <div className="text-xs text-[#6B7280] space-y-2">
-              <p><strong>Order ID:</strong> #{activeRequest.orderId?.slice(-8)}</p>
-              <p><strong>Pickup Distance:</strong> {activeRequest.pickupDistance?.toFixed(2)} KM</p>
-              <p><strong>Delivery Distance:</strong> {activeRequest.deliveryDistance?.toFixed(2)} KM</p>
-              <p><strong>Total Distance:</strong> {activeRequest.totalDistance?.toFixed(2)} KM</p>
-              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex justify-between items-center text-emerald-800">
-                <span className="font-extrabold uppercase text-[10px]">Estimated Earnings:</span>
-                <span className="text-lg font-black">₹{activeRequest.estimatedEarnings?.toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button 
-                onClick={handleRejectRequest}
-                className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-extrabold uppercase transition-all"
-              >
-                Reject Offer
-              </button>
-              <button 
-                onClick={handleAcceptRequest}
-                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-extrabold uppercase transition-all"
-              >
-                Accept Offer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between pl-1">
-        <div className="flex items-center gap-2">
-          <Truck className="w-6 h-6 text-[#22C55E]" />
-          <h2 className="text-2xl font-black text-[#111827]">Rider Dispatch Console</h2>
-        </div>
-        <div className="flex gap-2">
-          {agentProfile && (
-            <button 
-              onClick={toggleOnline}
-              className={`flex items-center gap-1.5 text-xs font-black px-4 py-2 rounded-xl border transition-all ${agentProfile.isOnline ? 'bg-emerald-100 border-emerald-200 text-emerald-700' : 'bg-rose-100 border-rose-200 text-rose-700'}`}
-            >
-              <Power className="w-3.5 h-3.5" />
-              <span>{agentProfile.isOnline ? 'Go Offline' : 'Go Online'}</span>
-            </button>
-          )}
-          <button onClick={() => setRefreshTrigger(prev => prev + 1)} className="p-2.5 bg-white border rounded-xl"><RefreshCw className="w-4 h-4" /></button>
-        </div>
-      </div>
-
-      {agentProfile && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border border-[#E5E7EB] p-5 rounded-2xl text-xs text-[#6B7280]">
-            <h4 className="font-extrabold text-[#111827] text-sm mb-1">{agentProfile.name}</h4>
-            <p>Rider ID: #{agentProfile._id.slice(-8)}</p>
-            {agentProfile.currentLocation && (
-              <p className="font-mono mt-1 text-[10px]">[{agentProfile.currentLocation.lat.toFixed(4)}, {agentProfile.currentLocation.lng.toFixed(4)}]</p>
-            )}
-          </div>
-          <div className="bg-white border border-[#E5E7EB] p-5 rounded-2xl text-xs text-[#6B7280] flex justify-between items-center">
-            <div>
-              <span className="block text-[9px] uppercase font-bold text-[#6B7280]">Rating</span>
-              <span className="font-extrabold text-[#F59E0B] text-lg">★ {agentProfile.rating || '5.0'}</span>
-            </div>
-            <div>
-              <span className="block text-[9px] uppercase font-bold text-[#6B7280]">Status</span>
-              <span className={`font-extrabold uppercase ${agentProfile.isAvailable ? 'text-emerald-600' : 'text-amber-500'}`}>{agentProfile.isAvailable ? 'Duty Ready' : 'Active Delivery'}</span>
-            </div>
-          </div>
-          <div className="bg-white border border-[#E5E7EB] p-5 rounded-2xl text-xs text-[#6B7280] flex justify-between items-center">
-            <div>
-              <span className="block text-[9px] uppercase font-bold text-[#6B7280]">Completed Deliveries</span>
-              <span className="font-extrabold text-[#111827] text-lg">{agentProfile.completedDeliveries || 0}</span>
-            </div>
-            <div>
-              <span className="block text-[9px] uppercase font-bold text-[#6B7280]">Accumulated Earnings</span>
-              <span className="font-extrabold text-emerald-600 text-lg">₹{agentProfile.earnings?.toFixed(2) || '0.00'}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <h3 className="font-extrabold text-[#111827] text-md">Your Assigned Delivery Tasks</h3>
-        {assignedOrders.length === 0 ? (
-          <div className="bg-white border rounded-2xl p-10 text-center space-y-2 text-xs text-[#6B7280] font-semibold">
-            <p>No active delivery items assigned.</p>
-            <p className="text-[#22C55E]">Toggle status to ONLINE to receive nearby dispatches!</p>
-          </div>
-        ) : (
-          assignedOrders.map((order, idx) => (
-            <div key={idx} className="bg-white border border-[#E5E7EB] p-6 rounded-2xl space-y-4">
-              <div className="flex justify-between items-center border-b pb-3 text-xs">
-                <div>
-                  <span className="text-[9px] text-[#6B7280] uppercase tracking-wider block font-bold">Delivery ID</span>
-                  <span className="font-extrabold text-[#111827]">Order #{order._id.slice(-8)}</span>
-                </div>
-                <StatusBadge status={order.orderStatus} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-[#6B7280]">
-                <div>
-                  <span className="text-[9px] text-[#6B7280] uppercase tracking-wider block mb-1">Customer Address</span>
-                  <div className="p-3 border bg-slate-50 rounded-xl space-y-0.5 text-[#111827]">
-                    <p className="font-bold">{order.address?.name}</p>
-                    <p className="text-[10px] text-[#6B7280]">Phone: {order.address?.phone}</p>
-                    <p className="text-[11px] font-medium leading-relaxed">{order.address?.houseNumber}, {order.address?.street}, {order.address?.city}</p>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-[9px] text-[#6B7280] uppercase tracking-wider block mb-1">Items Summary</span>
-                  <div className="p-3 border bg-slate-50 rounded-xl space-y-1.5 max-h-[110px] overflow-y-auto">
-                    {order.products.map((p, pIdx) => (
-                      <div key={pIdx} className="flex justify-between items-center">
-                        <span className="text-[#111827] font-bold">{p.name}</span>
-                        <span>x{p.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t flex justify-center">
-                <button
-                  onClick={() => handleSimulateStatus(order._id, order.orderStatus)}
-                  className="bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-extrabold px-6 py-2.5 rounded-xl uppercase tracking-wider"
-                >
-                  {order.orderStatus === 'Assigned' && 'Accept & Prepare Order'}
-                  {order.orderStatus === 'Preparing' && 'Pick Up Grocery Pack'}
-                  {order.orderStatus === 'Picked Up' && 'Start Transit'}
-                  {order.orderStatus === 'On The Way' && 'Arrived Near Home'}
-                  {order.orderStatus === 'Near You' && 'Mark Delivered'}
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }
@@ -1053,9 +561,6 @@ export default function DashboardPage() {
 
   if (user?.role === 'admin') {
     return <AdminDashboardView />;
-  }
-  if (user?.role === 'delivery_agent') {
-    return <AgentDashboardView />;
   }
   return <CustomerDashboard />;
 }

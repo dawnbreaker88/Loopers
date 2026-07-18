@@ -65,7 +65,6 @@ export const useAuth = () => {
     deleteAddress,
     verifyToken,
     isAdmin: user?.role === 'admin',
-    isAgent: user?.role === 'delivery_agent',
     isCustomer: user?.role === 'customer' || !user?.role,
   };
 };

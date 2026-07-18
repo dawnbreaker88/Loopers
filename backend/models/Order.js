@@ -11,7 +11,6 @@ const orderSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   products: [orderProductSchema],
   totalPrice: { type: Number, required: true },
-  deliveryAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryAgent', default: null },
   address: {
     name: { type: String, required: true },
     phone: { type: String, required: true },
@@ -28,26 +27,21 @@ const orderSchema = new mongoose.Schema({
   orderStatus: {
     type: String,
     enum: [
-      'Order Confirmed',
-      'Preparing',
-      'Assigned',
-      'Picked Up',
-      'On The Way',
-      'Near You',
+      'Placed',
+      'Accepted',
+      'Packed',
+      'Out For Delivery',
       'Delivered',
+      'Completed',
       'Cancelled'
     ],
-    default: 'Order Confirmed'
+    default: 'Placed'
   },
   storeLocation: {
     lat: { type: Number },
     lng: { type: Number }
   },
   customerLocation: {
-    lat: { type: Number },
-    lng: { type: Number }
-  },
-  agentLocation: {
     lat: { type: Number },
     lng: { type: Number }
   },
@@ -62,8 +56,6 @@ const orderSchema = new mongoose.Schema({
     }
   ],
   ratings: {
-    agentRating: { type: Number, min: 1, max: 5 },
-    agentReview: { type: String },
     experienceRating: { type: Number, min: 1, max: 5 }
   }
 }, { timestamps: true });

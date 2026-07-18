@@ -15,13 +15,14 @@ import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-import AIShoppingPage from './pages/AIShoppingPage.jsx';
+
 import ProductResultsPage from './pages/ProductResultsPage.jsx';
 import CartPage from './pages/CartPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
 import PaymentPage from './pages/PaymentPage.jsx';
 import OrderTrackingPage from './pages/OrderTrackingPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
+import AdminOrdersPage from './pages/AdminOrdersPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import useGeoLocation from './hooks/useGeoLocation.js';
@@ -75,14 +76,7 @@ function AppContent() {
             />
 
             {/* Protected Customer Routes */}
-            <Route 
-              path="/ai-search" 
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <AIShoppingPage />
-                </ProtectedRoute>
-              } 
-            />
+
             <Route 
               path="/cart" 
               element={
@@ -130,6 +124,16 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <ProfilePage />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Admin Dedicated Routes */}
+            <Route 
+              path="/admin/orders" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminOrdersPage />
                 </ProtectedRoute>
               } 
             />
