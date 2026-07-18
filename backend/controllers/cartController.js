@@ -40,7 +40,7 @@ export const getCart = async (req, res) => {
 // @route   POST /api/cart/add
 // @access  Private
 export const addToCart = async (req, res) => {
-  const { productId, quantity, items } = req.body; // Supports bulk add (from AI suggestions) or single add
+  const { productId, quantity, items } = req.body; // Supports bulk add or single add
 
   try {
     let cart = await Cart.findOne({ user: req.user._id });
@@ -48,7 +48,7 @@ export const addToCart = async (req, res) => {
       cart = await Cart.create({ user: req.user._id, items: [], totalPrice: 0 });
     }
 
-    // Process bulk items list (AI Cart generation)
+    // Process bulk items list
     if (items && Array.isArray(items)) {
       for (const item of items) {
         const prod = await Product.findById(item.productId);

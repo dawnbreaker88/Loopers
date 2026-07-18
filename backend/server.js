@@ -8,7 +8,6 @@ import connectDB from './config/db.js';
 // Route Imports
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import dispatchRoutes from './routes/dispatchRoutes.js';
@@ -21,7 +20,6 @@ dotenv.config();
 
 // Connect Database
 connectDB();
-console.log('Environment check: GEMINI_API_KEY is', process.env.GEMINI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,7 +47,6 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/dispatch', dispatchRoutes);

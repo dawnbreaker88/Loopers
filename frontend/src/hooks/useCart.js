@@ -2,7 +2,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   fetchCart, 
   addSingleItem, 
-  addBulkItems, 
   updateCartQty, 
   removeCartItem, 
   clearCartLocal 
@@ -18,9 +17,7 @@ export const useCart = () => {
     return dispatch(addSingleItem({ productId, quantity }));
   };
 
-  const addItemsBulk = (itemsArray) => {
-    return dispatch(addBulkItems(itemsArray));
-  };
+
 
   const updateQuantity = (productId, quantity) => {
     return dispatch(updateCartQty({ productId, quantity }));
@@ -44,7 +41,7 @@ export const useCart = () => {
     totalItemsCount,
     getCart,
     addToCart,
-    addItemsBulk,
+
     updateQuantity,
     removeFromCart,
     clearCart,

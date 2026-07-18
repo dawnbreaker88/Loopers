@@ -68,7 +68,7 @@ export const createOrder = async (req, res) => {
     // Calculate distance and delivery charge
     const { calculateDistance } = await import('../services/dispatchService.js');
     const distance = calculateDistance(storeLat, storeLng, customerLat, customerLng);
-    const deliveryCharge = parseFloat((distance * 4).toFixed(2));
+    const deliveryCharge = 1;
     const finalTotalPrice = parseFloat((cart.totalPrice + deliveryCharge).toFixed(2));
 
     // Create unique payment ID for simulation if not COD

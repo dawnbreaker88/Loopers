@@ -5,7 +5,6 @@ import { useCart } from '../hooks/useCart.js';
 import api from '../services/api.js';
 import productService from '../services/productService.js';
 import orderService from '../services/orderService.js';
-import aiService from '../services/aiService.js';
 
 // Sub-components
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -14,7 +13,7 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 
 // Icons
 import { 
-  Sparkles, ShoppingBag, ShoppingCart, ShieldAlert, Truck, 
+  ShoppingBag, ShoppingCart, ShieldAlert, Truck, 
   MapPin, Phone, CheckSquare, PlusCircle, BarChart3, 
   Users, Activity, CheckCircle, RefreshCw, Power, Star, ChevronRight,
   Package, UserCheck, XCircle, Compass, DollarSign, Ban, Trash2
@@ -88,13 +87,13 @@ function CustomerDashboard() {
       <div class="bg-white border border-[#E5E7EB] rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-soft">
         <div class="space-y-1">
           <h2 class="text-2xl font-black text-[#111827]">Welcome back, {user?.name}! 👋</h2>
-          <p class="text-xs text-[#6B7280] font-semibold">Ready to cook something delicious? Try our AI Smart Assistant.</p>
+          <p class="text-xs text-[#6B7280] font-semibold">Browse our products and order your fresh groceries now!</p>
         </div>
         <button 
-          onClick={() => navigate('/ai-search')}
+          onClick={() => navigate('/products')}
           class="bg-[#22C55E] hover:bg-[#16A34A] text-white text-xs font-extrabold px-5 py-3 rounded-xl transition-all shadow-sm shadow-[#22C55E]/10 uppercase tracking-wider flex items-center gap-2"
         >
-          AI Smart Assistant <Sparkles class="w-4 h-4" />
+          Browse Products <ShoppingBag class="w-4 h-4" />
         </button>
       </div>
 
@@ -180,7 +179,7 @@ function CustomerDashboard() {
    ADMIN SUB-DASHBOARD
    ============================================================================ */
 function AdminDashboardView() {
-  const [activeTab, setActiveTab] = useState('analytics'); // analytics, users, agents, orders, products, ai-logs
+  const [activeTab, setActiveTab] = useState('analytics'); // analytics, users, agents, orders, products
   const [stats, setStats] = useState({ revenue: 0, activeOrders: 0, totalProducts: 0, totalAgents: 0 });
   const [analytics, setAnalytics] = useState({
     totalOrders: 0,
@@ -194,7 +193,6 @@ function AdminDashboardView() {
   const [orders, setOrders] = useState([]);
   const [agents, setAgents] = useState([]);
   const [users, setUsers] = useState([]);
-  const [aiLogs, setAiLogs] = useState([]);
   
   // Product Creation
   const [showProductForm, setShowProductForm] = useState(false);
@@ -215,11 +213,10 @@ function AdminDashboardView() {
     const fetchAdminData = async () => {
       try {
         setLoading(true);
-        const [prodRes, orderRes, agentRes, aiRes, usersRes, analyticsRes] = await Promise.all([
+        const [prodRes, orderRes, agentRes, usersRes, analyticsRes] = await Promise.all([
           productService.getProducts(),
           orderService.getOrders(),
           orderService.getAgents(),
-          aiService.getHistory(),
           api.get('/api/admin/users'),
           api.get('/api/admin/analytics')
         ]);
@@ -227,7 +224,6 @@ function AdminDashboardView() {
         if (prodRes.success) setProducts(prodRes.products || []);
         if (orderRes.success) setOrders(orderRes.orders || []);
         if (agentRes.success) setAgents(agentRes.agents || []);
-        if (aiRes.success) setAiLogs(aiRes.history || []);
         if (usersRes.data.success) setUsers(usersRes.data.users || []);
         if (analyticsRes.data.success) setAnalytics(analyticsRes.data.analytics);
 
@@ -350,8 +346,7 @@ function AdminDashboardView() {
           { id: 'users', label: 'Users Management', icon: Users },
           { id: 'agents', label: 'Riders Management', icon: Truck },
           { id: 'products', label: 'Inventory Catalog', icon: Package },
-          { id: 'orders', label: 'Orders Register', icon: CheckCircle },
-          { id: 'ai-logs', label: 'AI Search Logs', icon: Sparkles }
+          { id: 'orders', label: 'Orders Register', icon: CheckCircle }
         ].map(t => (
           <button
             key={t.id}
@@ -695,36 +690,7 @@ function AdminDashboardView() {
         </div>
       )}
 
-      {activeTab === 'ai-logs' && (
-        <div className="bg-white border border-[#E5E7EB] p-6 rounded-3xl shadow-soft space-y-4">
-          <h3 className="font-extrabold text-[#111827] text-md">AI Shopping Prompt Audit Logs</h3>
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {aiLogs.length === 0 ? (
-              <p className="text-xs text-[#6B7280] py-6 text-center">No logs logged yet.</p>
-            ) : (
-              aiLogs.map((log, idx) => (
-                <div key={idx} className="p-4 rounded-xl border border-[#E5E7EB] bg-slate-50 space-y-2.5 text-xs text-[#6B7280]">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="font-bold">Query Log</span>
-                    <span>{new Date(log.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="font-bold text-[#111827] italic pl-2 border-l-2 border-[#22C55E]">"{log.prompt}"</p>
-                  <div>
-                    <span className="text-[9px] uppercase tracking-wider block mb-1 font-bold">Matched list items</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {log.aiResponse?.ingredients?.map((ing, iIdx) => (
-                        <span key={iIdx} className="text-[10px] bg-white border border-[#E5E7EB] text-[#111827] px-2 py-0.5 rounded-lg">
-                          {ing.ingredientName || ing.product} ({ing.requiredQuantity || ing.quantity})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
