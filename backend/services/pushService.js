@@ -49,8 +49,8 @@ export const sendNewOrderNotification = async (order) => {
       title: '🔔 New Order Received',
       body: `${customerName} • ${orderTotal}\n${firstLineAddress}`,
       orderId: order._id,
-      icon: '/pwa-icon.svg',
-      badge: '/pwa-icon.svg'
+      icon: '/loopers.svg',
+      badge: '/loopers.svg'
     });
 
     console.log(`[Push Service] Broadcasting new order push alert to ${activeSubscriptions.length} admin subscription(s)...`);
@@ -66,9 +66,9 @@ export const sendNewOrderNotification = async (order) => {
 
       return webPush.sendNotification(pushSubscription, payload)
         .catch(async (err) => {
-          // If subscription has expired or is invalid (404, 410 Gone)
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            console.log(`[Push Service Info] Pruning expired/invalid subscription endpoint: ${sub.endpoint}`);
+          // If subscription has expired or has key mismatch (403, 404, 410 Gone)
+          if ([403, 404, 410].includes(err.statusCode)) {
+            console.log(`[Push Service Info] Pruning invalid/expired admin subscription endpoint (${err.statusCode}): ${sub.endpoint}`);
             await AdminSubscription.deleteOne({ _id: sub._id });
           } else {
             console.error(`[Push Service Error] Failed to dispatch push:`, err.message);
@@ -128,8 +128,8 @@ export const sendCustomerOrderNotification = async (order, eventType = 'ORDER_AC
       orderId: order._id,
       type: eventType,
       url,
-      icon: '/pwa-icon.svg',
-      badge: '/pwa-icon.svg',
+      icon: '/loopers.svg',
+      badge: '/loopers.svg',
       timestamp: Date.now()
     });
 
@@ -146,8 +146,8 @@ export const sendCustomerOrderNotification = async (order, eventType = 'ORDER_AC
 
       return webPush.sendNotification(pushSubscription, payload)
         .catch(async (err) => {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            console.log(`[Push Service Info] Pruning expired user subscription endpoint: ${sub.endpoint}`);
+          if ([403, 404, 410].includes(err.statusCode)) {
+            console.log(`[Push Service Info] Pruning invalid/expired user subscription endpoint (${err.statusCode}): ${sub.endpoint}`);
             await UserSubscription.deleteOne({ _id: sub._id });
           } else {
             console.error(`[Push Service Error] Failed to send customer push:`, err.message);

@@ -8,16 +8,20 @@
   "orientation": "portrait",
   "theme_color": "#40A2E3",
   "background_color": "#0F172A",
-  "categories": ["shopping", "food", "lifestyle"],
+  "categories": [
+    "shopping",
+    "food",
+    "lifestyle"
+  ],
   "icons": [
     {
-      "src": "/pwa-icon.svg",
+      "src": "/loopers.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/pwa-icon.svg",
+      "src": "/loopers.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -35,14 +39,24 @@
       "short_name": "Products",
       "description": "Explore store catalog",
       "url": "/products",
-      "icons": [{ "src": "/pwa-icon.svg", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/loopers.svg",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "My Orders",
       "short_name": "Orders",
       "description": "Track active deliveries",
       "url": "/orders",
-      "icons": [{ "src": "/pwa-icon.svg", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/loopers.svg",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

@@ -3,7 +3,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/pwa-icon.svg',
+  '/loopers.svg',
   '/logo.svg'
 ];
 
@@ -83,7 +83,7 @@ self.addEventListener('fetch', (event) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
           }
-        }).catch(() => {});
+        }).catch(() => { });
         return cachedResponse;
       }
       return fetch(request).then((networkResponse) => {
@@ -107,11 +107,11 @@ self.addEventListener('push', (event) => {
   try {
     const data = event.data.json();
     const targetUrl = data.url || (data.orderId ? `/tracking/${data.orderId}` : '/orders');
-    
+
     const options = {
       body: data.body,
-      icon: data.icon || '/pwa-icon.svg',
-      badge: data.badge || '/pwa-icon.svg',
+      icon: data.icon || '/loopers.svg',
+      badge: data.badge || '/loopers.svg',
       tag: data.orderId ? `order-${data.orderId}-${data.type || 'status'}` : 'loopers-notification',
       data: {
         orderId: data.orderId,
@@ -146,7 +146,7 @@ self.addEventListener('notificationclick', (event) => {
           });
         }
       }
-      
+
       // If no active window is open, open a new window
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);

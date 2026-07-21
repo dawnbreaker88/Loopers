@@ -5,6 +5,17 @@ import { useSelector } from 'react-redux';
 import api from '../services/api.js';
 import toast from 'react-hot-toast';
 
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
+
 export default function NotificationPermissionPrompt() {
   const location = useLocation();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -65,18 +76,28 @@ export default function NotificationPermissionPrompt() {
       const registration = await ensureServiceWorker();
       if (!registration) return;
 
+      const keyRes = await api.get(keyEndpoint);
+      if (!keyRes.data?.success || !keyRes.data?.publicKey) return;
+
+      const expectedServerKey = urlBase64ToUint8Array(keyRes.data.publicKey);
       let subscription = await registration.pushManager.getSubscription();
-      
-      // If permission is already granted but no PushSubscription exists yet for this domain/key, subscribe now
-      if (!subscription) {
-        const keyRes = await api.get(keyEndpoint);
-        if (keyRes.data?.success && keyRes.data?.publicKey) {
-          const subscribeOptions = {
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(keyRes.data.publicKey)
-          };
-          subscription = await registration.pushManager.subscribe(subscribeOptions);
+
+      // Check if existing subscription key matches server key
+      let needsNewSubscription = !subscription;
+      if (subscription && subscription.options?.applicationServerKey) {
+        const currentKey = new Uint8Array(subscription.options.applicationServerKey);
+        if (currentKey.length !== expectedServerKey.length || !currentKey.every((val, i) => val === expectedServerKey[i])) {
+          console.log('[Notification Sync] VAPID key mismatch detected. Resubscribing...');
+          await subscription.unsubscribe().catch(() => {});
+          needsNewSubscription = true;
         }
+      }
+
+      if (needsNewSubscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: expectedServerKey
+        });
       }
 
       if (subscription) {
@@ -89,16 +110,7 @@ export default function NotificationPermissionPrompt() {
     }
   };
 
-  const urlBase64ToUint8Array = (base64String) => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  };
+
 
   const handleRequestPermission = async () => {
     setLoading(true);

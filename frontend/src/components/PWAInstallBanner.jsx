@@ -46,7 +46,7 @@ export default function PWAInstallBanner() {
 
         <div className="flex items-start space-x-3.5 pr-6">
           <div className="w-12 h-12 rounded-xl bg-[#40A2E3] flex items-center justify-center text-white shrink-0 shadow-lg shadow-[#40A2E3]/30 p-2">
-            <img src="/pwa-icon.svg" alt="Loopers" className="w-full h-full object-contain" />
+            <img src="/loopers.svg" alt="Loopers" className="w-full h-full object-contain" />
           </div>
 
           <div>
@@ -70,7 +70,7 @@ export default function PWAInstallBanner() {
             <Download size={14} />
             <span>Install App</span>
           </button>
-          
+
           <button
             onClick={handleDismiss}
             className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors"
