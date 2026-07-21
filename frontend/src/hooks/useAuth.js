@@ -68,9 +68,9 @@ export const useAuth = () => {
     updateAddress,
     deleteAddress,
     verifyToken,
-    updateProfile,
-    isAdmin: user?.role === 'admin',
-    isCustomer: user?.role === 'customer' || !user?.role,
+    role: user?.role || null,
+    isAdmin: isAuthenticated && user?.role === 'admin',
+    isCustomer: isAuthenticated ? user?.role === 'customer' : false,
   };
 };
 

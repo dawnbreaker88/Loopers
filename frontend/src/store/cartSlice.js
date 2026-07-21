@@ -20,9 +20,9 @@ export const fetchCart = createAsyncThunk(
 // Thunk to add single item
 export const addSingleItem = createAsyncThunk(
   'cart/addSingle',
-  async ({ productId, quantity }, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const response = await api.post('/api/cart/add', { productId, quantity });
+      const response = await api.post('/api/cart/add', payload);
       if (response.data.success) {
         return response.data.cart;
       }

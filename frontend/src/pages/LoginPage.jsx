@@ -1,268 +1,192 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth.js';
-import { Mail, Lock, KeyRound, ShoppingBag } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { loginSuccess } from '../store/authSlice.js';
+import authService from '../services/authService.js';
+import Logo from '../components/Logo.jsx';
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function LoginPage() {
-  const { loginUser, loginWithGoogle } = useAuth();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  
-  const handleCredentialResponse = async (response) => {
-    setSubmitting(true);
-    try {
-      const data = await loginWithGoogle({ token: response.credential });
-      if (data.success) {
-        toast.success(`Logged in with Google as ${data.user.name}`);
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      console.error('Google Oauth Login error:', err);
-      toast.error(err.response?.data?.message || 'Google sign-in failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const dispatch = useDispatch();
 
-  useEffect(() => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!googleClientId) return;
-
-    let checkInterval;
-    const initGoogle = () => {
-      if (window.google) {
-        clearInterval(checkInterval);
-        try {
-          window.google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: handleCredentialResponse,
-            cancel_on_tap_outside: false
-          });
-
-          const btnDiv = document.getElementById('google-signin-div');
-          if (btnDiv) {
-            window.google.accounts.id.renderButton(btnDiv, {
-              theme: 'outline',
-              size: 'large',
-              width: btnDiv.offsetWidth || 384,
-              text: 'continue_with',
-              shape: 'rectangular'
-            });
-          }
-
-          window.google.accounts.id.prompt();
-        } catch (err) {
-          console.error('Error rendering Google Sign-In button:', err);
-        }
-      }
-    };
-
-    checkInterval = setInterval(initGoogle, 100);
-    initGoogle();
-
-    return () => clearInterval(checkInterval);
-  }, []);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!identifier || !password) {
-      toast.error('Please enter email/phone and password');
+    if (!email || !password) {
+      toast.error('Please enter all fields');
       return;
     }
 
-    setSubmitting(true);
+    setLoading(true);
     try {
-      const data = await loginUser({ identifier, password });
+      const data = await authService.login({ email, password });
       if (data.success) {
+        dispatch(loginSuccess({ token: data.accessToken, user: data.user }));
         toast.success(`Welcome back, ${data.user.name}!`);
-        // Redirect to dashboard (DashboardPage handles role routing)
-        navigate('/dashboard');
+
+        if (data.user.role === 'admin') {
+          navigate('/admin/orders');
+        } else {
+          navigate('/');
+        }
+      } else {
+        toast.error(data.message || 'Login failed');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed. Invalid credentials.');
+      toast.error(err.response?.data?.message || 'Invalid email or password');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setSubmitting(true);
+  const handleSimulatedGoogleLogin = async () => {
+    setLoading(true);
     try {
-      const simulatedGoogleData = {
-        name: "Google Guest",
-        email: "googleguest@gmail.com",
-        googleId: `google_${Math.floor(100000 + Math.random() * 900000)}`,
-        imageUrl: "https://lh3.googleusercontent.com/a/default-user"
-      };
-      const data = await loginWithGoogle(simulatedGoogleData);
+      const data = await authService.googleLogin({
+        name: 'Google User',
+        email: 'googleuser@gmail.com',
+        googleId: 'google_oauth_123456789',
+        imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop'
+      });
       if (data.success) {
-        toast.success(`Logged in with Google as ${data.user.name}`);
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      toast.error('Google sign-in simulation failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+        dispatch(loginSuccess({ token: data.accessToken, user: data.user }));
+        toast.success(`Google sign-in successful! Welcome, ${data.user.name}`);
 
-  const handleQuickLogin = async (quickEmail, quickPassword, roleName) => {
-    setSubmitting(true);
-    try {
-      const data = await loginUser({ email: quickEmail, password: quickPassword });
-      if (data.success) {
-        toast.success(`Logged in as Demo ${roleName}`);
-        navigate('/dashboard');
+        if (data.user.role === 'admin') {
+          navigate('/admin/orders');
+        } else {
+          navigate('/');
+        }
       }
     } catch (err) {
-      toast.error(`Demo login failed. Make sure DB is seeded and running.`);
+      toast.error('Google simulated login failed');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div class="min-h-[75vh] flex flex-col items-center justify-center py-6 px-4">
-      {/* Platform Title */}
-      <div class="text-center mb-6 flex flex-col items-center">
-        <div class="flex items-center gap-2 mb-1.5">
-          <ShoppingBag class="w-6 h-6 text-[#22C55E]" />
-          <h1 class="text-3xl font-black text-[#111827] tracking-tight">
-            InstaDispatch
-          </h1>
-        </div>
-        <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">Hyperlocal Grocery & Delivery Services</p>
+    <div className="flex flex-col items-center justify-center min-h-[75vh] px-4 py-8">
+
+      {/* Logo Header */}
+      <div className="flex flex-col items-center mb-6 text-center">
+        <Logo size="large" className="mb-3" />
+        <h2 className="text-lg font-black text-[#0F172A] dark:text-white tracking-tight">Fast. Fresh. Loopers.</h2>
+        <p className="text-xs font-semibold text-[#64748B] dark:text-slate-400 mt-0.5">Delivery fees just ₹1</p>
       </div>
 
       {/* Login Card */}
-      <div class="w-full max-w-md bg-white border border-[#E5E7EB] p-8 rounded-2xl shadow-card space-y-6">
-        <div class="text-center">
-          <h2 class="text-lg font-extrabold text-[#111827] mb-1">Sign in to your account</h2>
-          <p class="text-xs text-[#6B7280] font-semibold">
-            Or{' '}
-            <Link to="/signup" class="text-[#22C55E] hover:underline font-extrabold">
-              create a new account
-            </Link>
-          </p>
-        </div>
+      <div className="w-full max-w-md bg-sys-surface rounded-3xl border border-sys-border shadow-soft p-6 sm:p-8 animate-fade-in">
+        <form onSubmit={handleLogin} className="space-y-4">
 
-        <form onSubmit={handleLogin} class="space-y-4">
-          {/* Email / Phone */}
-          <div class="space-y-1">
-            <label class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider pl-0.5">Email or Phone</label>
-            <div class="relative">
-              <Mail class="absolute left-3 top-3 w-4.5 h-4.5 text-[#6B7280]" />
-              <input 
-                type="text"
-                required
-                placeholder="you@example.com or 9876543210"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                disabled={submitting}
-                class="w-full border border-[#E5E7EB] focus:border-[#22C55E] text-xs font-semibold rounded-xl py-3 pl-10 pr-4 focus:outline-none disabled:opacity-60"
-              />
-            </div>
+          <div className="flex flex-col">
+            <label className="text-xs font-bold text-[#0F172A] dark:text-white mb-1.5 flex items-center">
+              <User size={13} className="mr-1 text-[#40A2E3]" />
+              Email or Phone
+            </label>
+            <input
+              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder=" your email"
+              className="w-full px-4 py-3 rounded-xl border border-[#E2E8F0] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-[#0F172A] dark:text-white focus:outline-none focus:border-[#40A2E3]"
+            />
           </div>
 
-          {/* Password */}
-          <div class="space-y-1">
-            <label class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider pl-0.5">Password</label>
-            <div class="relative">
-              <Lock class="absolute left-3 top-3 w-4.5 h-4.5 text-[#6B7280]" />
-              <input 
-                type="password"
-                required
-                placeholder="••••••••"
+          <div className="flex flex-col">
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs font-bold text-[#0F172A] dark:text-white flex items-center">
+                <Lock size={13} className="mr-1 text-[#40A2E3]" />
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => toast.error('Reset instructions sent to email')}
+                className="text-[10px] font-bold text-[#40A2E3] hover:underline"
+              >
+                Forgot?
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={submitting}
-                class="w-full border border-[#E5E7EB] focus:border-[#22C55E] text-xs font-semibold rounded-xl py-3 pl-10 pr-4 focus:outline-none disabled:opacity-60"
+                placeholder="Enter password"
+                className="w-full pl-4 pr-10 py-3 rounded-xl border border-[#E2E8F0] dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-[#0F172A] dark:text-white focus:outline-none focus:border-[#40A2E3]"
               />
-            </div>
-          </div>
-
-          {/* Extra options */}
-          <div class="flex items-center justify-between text-[11px] font-bold text-[#6B7280] select-none">
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input 
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                class="accent-[#22C55E]"
-              />
-              <span>Remember me</span>
-            </label>
-            <a href="#" onClick={(e) => { e.preventDefault(); toast.success('Password reset link simulated'); }} class="hover:text-[#22C55E] transition-colors">
-              Forgot password?
-            </a>
-          </div>
-
-          {/* Submit */}
-          <button 
-            type="submit"
-            disabled={submitting}
-            class="w-full bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22C55E]/20 text-xs uppercase tracking-wider disabled:opacity-60"
-          >
-            {submitting ? 'Signing In...' : 'Sign In'}
-          </button>
-
-          {/* Google Login */}
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
-            <div class="space-y-2">
-              <div id="google-signin-div" class="w-full flex justify-center min-h-[44px]"></div>
-              <p class="text-[10px] text-[#6B7280] font-semibold text-center">
-                Using official Google Sign-In. Check One Tap in the top right.
-              </p>
-            </div>
-          ) : (
-            <div class="space-y-1">
-              <button 
+              <button
                 type="button"
-                onClick={handleGoogleLogin}
-                disabled={submitting}
-                class="w-full bg-white border border-[#E5E7EB] hover:bg-slate-50 text-[#111827] font-extrabold py-3 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] dark:text-slate-400"
               >
-                <svg class="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.466 0-6.277-2.81-6.277-6.277 0-3.466 2.81-6.277 6.277-6.277 1.503 0 2.873.53 3.96 1.402l2.967-2.967C18.847 2.44 15.772 1.5 12.24 1.5c-5.799 0-10.5 4.7-10.5 10.5s4.701 10.5 10.5 10.5c5.789 0 10.25-4.067 10.25-10.285 0-.616-.067-1.16-.183-1.63H12.24z"/>
-                </svg>
-                <span>Continue with Google (Sandbox)</span>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-              <p class="text-[10px] text-[#6B7280] font-semibold text-center">
-                Tip: Set VITE_GOOGLE_CLIENT_ID in your env file to enable real Google Sign-In.
-              </p>
             </div>
-          )}
+          </div>
+
+          <div className="flex items-center space-x-2 py-1">
+            <input
+              type="checkbox"
+              id="remember"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 text-[#40A2E3] border-[#E2E8F0] dark:border-slate-700 rounded"
+            />
+            <label htmlFor="remember" className="text-xs font-semibold text-[#64748B] dark:text-slate-400 select-none cursor-pointer">
+              Remember this device
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#40A2E3] text-white py-3.5 rounded-xl text-xs font-black shadow-md shadow-[#40A2E3]/20 hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-1"
+          >
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <>
+                <span>Sign In</span>
+                <ArrowRight size={14} />
+              </>
+            )}
+          </button>
         </form>
 
-        {/* Sandbox accounts */}
-        <div class="pt-6 border-t border-[#E5E7EB] space-y-3">
-          <div class="flex items-center gap-1.5 justify-center text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">
-            <KeyRound class="w-3.5 h-3.5" />
-            <span>Sandbox Quick Accounts</span>
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[#E2E8F0] dark:border-slate-700"></div>
           </div>
-          
-          <div class="grid grid-cols-2 gap-2">
-            <button 
-              type="button"
-              onClick={() => handleQuickLogin('user@delivery.com', 'user12345', 'Customer')}
-              class="text-[10px] font-bold bg-[#F8FAFC] hover:bg-[#22C55E]/5 text-[#6B7280] hover:text-[#22C55E] border border-[#E5E7EB] hover:border-[#22C55E]/20 py-2.5 rounded-lg transition-all"
-            >
-              Customer Demo
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleQuickLogin('cp@gmail.com', 'camperprabs', 'Admin')}
-              class="text-[10px] font-bold bg-[#F8FAFC] hover:bg-[#22C55E]/5 text-[#6B7280] hover:text-[#22C55E] border border-[#E5E7EB] hover:border-[#22C55E]/20 py-2.5 rounded-lg transition-all"
-            >
-              Admin Demo
-            </button>
+          <div className="relative flex justify-center text-[10px] font-bold text-[#64748B] dark:text-slate-400 uppercase">
+            <span className="bg-white dark:bg-[#1E293B] px-3">or continue with</span>
           </div>
         </div>
+
+        <button
+          onClick={handleSimulatedGoogleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E2E8F0] dark:border-slate-700 text-xs font-bold text-[#0F172A] dark:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        >
+          <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4 mr-2" />
+          Continue with Google
+        </button>
       </div>
+
+      <p className="text-xs font-bold text-[#64748B] dark:text-slate-400 mt-6">
+        New to Loopers?{' '}
+        <Link to="/signup" className="text-[#40A2E3] hover:underline">
+          Create Account
+        </Link>
+      </p>
+
     </div>
   );
 }

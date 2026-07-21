@@ -108,6 +108,33 @@ const productSlice = createSlice({
     },
     clearProductFilters: (state) => {
       state.filters = { category: 'All', search: '', sortBy: 'default' };
+    },
+    productAddedFromSocket: (state, action) => {
+      const newProduct = action.payload;
+      if (!newProduct || !newProduct._id) return;
+      const exists = state.products.some(p => p._id === newProduct._id);
+      if (!exists) {
+        state.products.unshift(newProduct);
+      }
+    },
+    productUpdatedFromSocket: (state, action) => {
+      const updatedProduct = action.payload;
+      if (!updatedProduct || !updatedProduct._id) return;
+      const index = state.products.findIndex(p => p._id === updatedProduct._id);
+      if (index > -1) {
+        state.products[index] = { ...state.products[index], ...updatedProduct };
+      }
+      if (state.singleProduct && state.singleProduct._id === updatedProduct._id) {
+        state.singleProduct = { ...state.singleProduct, ...updatedProduct };
+      }
+    },
+    productDeletedFromSocket: (state, action) => {
+      const deletedId = action.payload?._id || action.payload?.id || action.payload;
+      if (!deletedId) return;
+      state.products = state.products.filter(p => p._id !== deletedId);
+      if (state.singleProduct && state.singleProduct._id === deletedId) {
+        state.singleProduct = null;
+      }
     }
   },
   extraReducers: (builder) => {
@@ -150,5 +177,13 @@ const productSlice = createSlice({
   }
 });
 
-export const { setCategoryFilter, setSearchFilter, setSortingFilter, clearProductFilters } = productSlice.actions;
+export const { 
+  setCategoryFilter, 
+  setSearchFilter, 
+  setSortingFilter, 
+  clearProductFilters,
+  productAddedFromSocket,
+  productUpdatedFromSocket,
+  productDeletedFromSocket
+} = productSlice.actions;
 export default productSlice.reducer;

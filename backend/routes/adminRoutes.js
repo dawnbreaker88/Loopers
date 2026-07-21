@@ -2,13 +2,22 @@ import express from 'express';
 import { 
   getAllUsers, 
   updateUserStatus, 
-  getAdminAnalytics,
   acceptOrder,
   packOrder,
   outForDeliveryOrder,
   deliverOrder,
-  cancelOrderAdmin
+  cancelOrderAdmin,
+  getVapidPublicKey,
+  subscribeAdmin
 } from '../controllers/adminController.js';
+import {
+  getAdminAnalyticsSummary,
+  getOrderAnalytics,
+  getRevenueAnalytics,
+  getProductAnalytics,
+  getCustomerAnalytics,
+  getGeographicAnalytics
+} from '../controllers/analyticsController.js';
 import { protect, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -18,7 +27,18 @@ router.use(isAdmin);
 
 router.get('/users', getAllUsers);
 router.put('/users/:id/status', updateUserStatus);
-router.get('/analytics', getAdminAnalytics);
+
+// Web Push MVP routes
+router.get('/vapid-public-key', getVapidPublicKey);
+router.post('/subscribe', subscribeAdmin);
+
+// Analytics endpoints
+router.get('/analytics', getAdminAnalyticsSummary);
+router.get('/analytics/orders', getOrderAnalytics);
+router.get('/analytics/revenue', getRevenueAnalytics);
+router.get('/analytics/products', getProductAnalytics);
+router.get('/analytics/customers', getCustomerAnalytics);
+router.get('/analytics/geographic', getGeographicAnalytics);
 
 // Order Lifecycle routes
 router.post('/orders/:id/accept', acceptOrder);

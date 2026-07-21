@@ -1,5 +1,9 @@
 import User from '../models/User.js';
-import { generateAccessToken, generateRefreshToken } from '../middleware/auth.js';
+import Order from '../models/Order.js';
+import UserSubscription from '../models/UserSubscription.js';
+import { vapidKeys } from '../services/pushService.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../middleware/auth.js';
+
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -249,7 +253,7 @@ export const logoutUser = async (req, res) => {
 // @route   POST /api/auth/address
 // @access  Private
 export const addAddress = async (req, res) => {
-  const { name, phone, houseNumber, street, city, state, pincode, landmark, isDefault } = req.body;
+  const { name, phone, houseNumber, street, city, state, pincode, landmark, isDefault, latitude, longitude } = req.body;
 
   try {
     const user = await User.findById(req.user._id);
@@ -266,6 +270,8 @@ export const addAddress = async (req, res) => {
       state,
       pincode,
       landmark,
+      latitude,
+      longitude,
       isDefault: isDefault || false
     };
 
@@ -289,7 +295,7 @@ export const addAddress = async (req, res) => {
 // @access  Private
 export const updateAddress = async (req, res) => {
   const { addressId } = req.params;
-  const { name, phone, houseNumber, street, city, state, pincode, landmark, isDefault } = req.body;
+  const { name, phone, houseNumber, street, city, state, pincode, landmark, isDefault, latitude, longitude } = req.body;
 
   try {
     const user = await User.findById(req.user._id);
@@ -312,6 +318,8 @@ export const updateAddress = async (req, res) => {
     if (pincode !== undefined) address.pincode = pincode;
     if (landmark !== undefined) address.landmark = landmark;
     if (isDefault !== undefined) address.isDefault = isDefault;
+    if (latitude !== undefined) address.latitude = latitude;
+    if (longitude !== undefined) address.longitude = longitude;
 
     // If setting as default, clear others
     if (address.isDefault) {
@@ -328,6 +336,7 @@ export const updateAddress = async (req, res) => {
     console.error('Update Address Error:', error.message);
     return res.status(500).json({ success: false, message: 'Server error updating address' });
   }
+
 };
 
 // @desc    Delete an address
@@ -382,6 +391,36 @@ export const updateUserLocation = async (req, res) => {
     user.location = { latitude, longitude };
     await user.save();
 
+    if (user.role === 'admin') {
+      // Propagate location update to all active orders assigned to this admin
+      await Order.updateMany(
+        { 
+          assignedAdmin: user._id, 
+          orderStatus: { $in: ['Confirmed', 'Preparing', 'Out for Delivery'] } 
+        },
+        { 
+          $set: { 'agentLocation.lat': latitude, 'agentLocation.lng': longitude } 
+        }
+      );
+
+      // Broadcast updated location to active customer tracking rooms via Socket.io
+      const activeOrders = await Order.find({
+        assignedAdmin: user._id,
+        orderStatus: { $in: ['Confirmed', 'Preparing', 'Out for Delivery'] }
+      }).populate('user', 'name email phone');
+
+      const io = req.app.get('socketio');
+      if (io) {
+        activeOrders.forEach(order => {
+          const userRoom = order.user._id ? order.user._id.toString() : order.user.toString();
+          io.to(userRoom).emit('orderUpdated', order);
+          io.to(userRoom).emit('riderLocationUpdate', {
+            orderId: order._id,
+            agentLocation: { lat: latitude, lng: longitude }
+          });
+        });
+      }
+    }
 
     return res.json({
       success: true,
@@ -393,6 +432,7 @@ export const updateUserLocation = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error updating location' });
   }
 };
+
 
 // @desc    Update user profile details
 // @route   PUT /api/auth/profile
@@ -422,8 +462,10 @@ export const updateUserProfile = async (req, res) => {
     // Update fields
     if (name !== undefined) user.name = name.trim();
     if (phone !== undefined) user.phone = phone.trim();
+    if (req.body.email !== undefined && req.body.email.trim() !== '') user.email = req.body.email.trim();
 
     await user.save();
+
 
     // If delivery agent role, also update corresponding DeliveryAgent info
     if (user.role === 'delivery_agent') {
@@ -500,3 +542,76 @@ export const changePassword = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error during password change' });
   }
 };
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+export const refreshToken = async (req, res) => {
+  const { refreshToken: token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'Refresh token is required' });
+  }
+
+  try {
+    const decoded = verifyRefreshToken(token);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user || user.status !== 'active') {
+      return res.status(401).json({ success: false, message: 'Invalid token or inactive user' });
+    }
+
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    return res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+  }
+};
+
+// @desc    Get VAPID Public Key for Web Push
+// @route   GET /api/auth/vapid-public-key
+// @access  Private
+export const getVapidPublicKey = async (req, res) => {
+  return res.json({
+    success: true,
+    publicKey: vapidKeys.publicKey
+  });
+};
+
+// @desc    Subscribe user for web push notifications
+// @route   POST /api/auth/subscribe
+// @access  Private
+export const subscribePush = async (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription || !subscription.endpoint || !subscription.keys) {
+    return res.status(400).json({ success: false, message: 'Invalid push subscription data' });
+  }
+
+  try {
+    await UserSubscription.findOneAndUpdate(
+      { endpoint: subscription.endpoint },
+      {
+        user: req.user._id,
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ success: true, message: 'Push subscription saved' });
+  } catch (error) {
+    console.error('Subscribe Push Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to save push subscription' });
+  }
+};
+
+

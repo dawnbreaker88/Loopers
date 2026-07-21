@@ -104,6 +104,37 @@ const orderSlice = createSlice({
       if (existing) {
         existing.orderStatus = orderStatus;
       }
+    },
+    newOrderReceived: (state, action) => {
+      const newOrder = action.payload;
+      const exists = state.orders.some(o => o._id === newOrder._id);
+      if (!exists) {
+        state.orders.unshift(newOrder);
+      }
+    },
+    orderUpdatedSocket: (state, action) => {
+      const updatedOrder = action.payload;
+      if (!updatedOrder || !updatedOrder._id) return;
+      const index = state.orders.findIndex(o => o._id === updatedOrder._id);
+      if (index > -1) {
+        state.orders[index] = { ...state.orders[index], ...updatedOrder };
+      } else {
+        state.orders.unshift(updatedOrder);
+      }
+      if (state.activeOrder && state.activeOrder._id === updatedOrder._id) {
+        state.activeOrder = { ...state.activeOrder, ...updatedOrder };
+      }
+    },
+    riderLocationUpdatedSocket: (state, action) => {
+      const { orderId, agentLocation } = action.payload || {};
+      if (!orderId || !agentLocation) return;
+      if (state.activeOrder && state.activeOrder._id === orderId) {
+        state.activeOrder.agentLocation = agentLocation;
+      }
+      const existing = state.orders.find(o => o._id === orderId);
+      if (existing) {
+        existing.agentLocation = agentLocation;
+      }
     }
   },
   extraReducers: (builder) => {
@@ -114,7 +145,18 @@ const orderSlice = createSlice({
       })
       .addCase(fetchOrders.fulfilled, (state, action) => {
         state.loading = false;
-        state.orders = action.payload || [];
+        const fetchedOrders = action.payload || [];
+        const existingOrdersMap = new Map(state.orders.map(o => [o._id, o]));
+        
+        // Add or update elements in the map
+        fetchedOrders.forEach(order => {
+          existingOrdersMap.set(order._id, order);
+        });
+
+        // Convert back to array, sorting by createdAt descending
+        state.orders = Array.from(existingOrdersMap.values()).sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
       })
       .addCase(fetchOrders.rejected, (state, action) => {
         state.loading = false;
@@ -166,5 +208,5 @@ const orderSlice = createSlice({
   }
 });
 
-export const { clearActiveOrder, updateOrderStatusLocal } = orderSlice.actions;
+export const { clearActiveOrder, updateOrderStatusLocal, newOrderReceived, orderUpdatedSocket, riderLocationUpdatedSocket } = orderSlice.actions;
 export default orderSlice.reducer;

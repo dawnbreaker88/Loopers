@@ -102,11 +102,20 @@ export const changeUserPassword = createAsyncThunk(
 );
 
 const tokenFromStorage = localStorage.getItem('token') || '';
+let userFromStorage = null;
+try {
+  const rawUser = localStorage.getItem('user');
+  if (rawUser) {
+    userFromStorage = JSON.parse(rawUser);
+  }
+} catch (e) {
+  localStorage.removeItem('user');
+}
 
 const initialState = {
-  user: null,
+  user: userFromStorage,
   token: tokenFromStorage,
-  isAuthenticated: false,
+  isAuthenticated: !!(tokenFromStorage && userFromStorage),
   loading: !!tokenFromStorage,
   error: null,
 };
@@ -122,6 +131,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
       api.defaults.headers.common['Authorization'] = `Bearer ${action.payload.token}`;
     },
     logout: (state) => {
@@ -131,6 +141,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       delete api.defaults.headers.common['Authorization'];
     },
     clearAuthError: (state) => {
@@ -139,6 +150,7 @@ const authSlice = createSlice({
     updateUserLocationAction: (state, action) => {
       if (state.user) {
         state.user.location = action.payload;
+        localStorage.setItem('user', JSON.stringify(state.user));
       }
     }
   },
@@ -150,14 +162,18 @@ const authSlice = createSlice({
       })
       .addCase(loadUserProfile.fulfilled, (state, action) => {
         state.loading = false;
-        if (action.payload) {
+        if (action.payload && action.payload.user) {
           state.user = action.payload.user;
           state.token = action.payload.token;
           state.isAuthenticated = true;
+          localStorage.setItem('user', JSON.stringify(action.payload.user));
+          localStorage.setItem('token', action.payload.token);
         } else {
           state.user = null;
           state.token = '';
           state.isAuthenticated = false;
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
         }
       })
       .addCase(loadUserProfile.rejected, (state, action) => {
@@ -167,27 +183,32 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.error = action.payload;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         delete api.defaults.headers.common['Authorization'];
       })
       .addCase(addUserAddress.fulfilled, (state, action) => {
         if (state.user) {
           state.user.addresses = action.payload;
+          localStorage.setItem('user', JSON.stringify(state.user));
         }
       })
       .addCase(updateUserAddress.fulfilled, (state, action) => {
         if (state.user) {
           state.user.addresses = action.payload;
+          localStorage.setItem('user', JSON.stringify(state.user));
         }
       })
       .addCase(deleteUserAddress.fulfilled, (state, action) => {
         if (state.user) {
           state.user.addresses = action.payload;
+          localStorage.setItem('user', JSON.stringify(state.user));
         }
       })
       .addCase(updateUserProfileThunk.fulfilled, (state, action) => {
         if (state.user && action.payload) {
           state.user.name = action.payload.name;
           state.user.phone = action.payload.phone;
+          localStorage.setItem('user', JSON.stringify(state.user));
         }
       });
   }

@@ -1,14 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import { store } from './store/index.js';
 import { loadUserProfile } from './store/authSlice.js';
+import { ThemeProvider } from './context/ThemeContext.jsx';
+import api from './services/api.js';
 
 // Component Imports
 import Navbar from './components/Navbar.jsx';
-import Footer from './components/Footer.jsx';
+import FloatingCartBar from './components/FloatingCartBar.jsx';
+import BottomNav from './components/BottomNav.jsx';
+
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import BrandedLoader from './components/BrandedLoader.jsx';
+import StoreClosedScreen from './components/StoreClosedScreen.jsx';
+import NotificationPermissionPrompt from './components/NotificationPermissionPrompt.jsx';
 
 // Page Imports
 import LandingPage from './pages/LandingPage.jsx';
@@ -26,13 +33,52 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import useGeoLocation from './hooks/useGeoLocation.js';
 
+import OfflineBanner from './components/OfflineBanner.jsx';
+import PWAInstallBanner from './components/PWAInstallBanner.jsx';
+import { initSocket, disconnectSocket, subscribeToSocketEvents } from './services/socketService.js';
+
 function AppContent() {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const loading = useSelector(state => state.auth.loading);
+  const user = useSelector(state => state.auth.user);
+
+  const [storeStatus, setStoreStatus] = useState(null);
 
   // Activate Geolocation tracking
   useGeoLocation();
+
+  const fetchStoreStatus = async () => {
+    try {
+      const res = await api.get('/api/store/status');
+      if (res.data.success) {
+        setStoreStatus(res.data.store);
+      }
+    } catch (err) {
+      console.error('Failed to fetch store status');
+    }
+  };
+
+  useEffect(() => {
+    fetchStoreStatus();
+    const interval = setInterval(fetchStoreStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Socket initialization and live store status listener
+  useEffect(() => {
+    if (user && token) {
+      initSocket(user, token);
+    }
+    const unsubscribe = subscribeToSocketEvents((eventName, data) => {
+      if (eventName === 'storeStatusUpdated' && data) {
+        setStoreStatus(data);
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [user, token]);
 
   // Load profile on start if token exists
   useEffect(() => {
@@ -43,119 +89,146 @@ function AppContent() {
 
   if (loading && token) {
     return (
-      <div class="flex items-center justify-center min-h-screen bg-[#F8FAFC]">
-        <div class="flex flex-col items-center">
-          <div class="w-12 h-12 border-4 border-[#22C55E] border-t-transparent rounded-full animate-spin"></div>
-          <p class="mt-4 text-xs font-bold text-[#6B7280] uppercase tracking-wider animate-pulse">Initializing InstaDispatch...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A]">
+        <BrandedLoader message="Initializing session..." />
       </div>
     );
   }
 
+  const isStoreClosed = storeStatus && storeStatus.isOpen === false && user?.role !== 'admin';
+
   return (
     <Router>
-      <div class="flex flex-col min-h-screen bg-[#F8FAFC] text-[#111827]">
+      <OfflineBanner />
+      <div
+        className="
+    flex
+    flex-col
+    min-h-screen
+    bg-[var(--sys-background)]
+    text-[var(--sys-text-primary)]
+    font-sans
+    antialiased
+    transition-colors
+  "
+      >
         <Navbar />
-        <main class="flex-grow container mx-auto px-4 py-8 max-w-7xl">
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/products" element={<ProductResultsPage />} />
+        <main className="flex-grow container mx-auto px-4 py-6 max-w-7xl pt-safe">
+          <NotificationPermissionPrompt />
+          {isStoreClosed ? (
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/admin/orders" element={<AdminOrdersPage />} />
+              <Route path="*" element={<StoreClosedScreen store={storeStatus} onRefresh={fetchStoreStatus} />} />
+            </Routes>
+          ) : (
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/products" element={<ProductResultsPage />} />
 
-            {/* Protected Multi-Role Dashboard */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected Multi-Role Dashboard */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Protected Customer Routes */}
-            <Route
-              path="/cart"
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <CartPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/checkout"
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <CheckoutPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/payment"
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <PaymentPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <ProtectedRoute allowedRoles={['customer']}>
-                  <OrdersPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected Customer Routes */}
+              <Route
+                path="/cart"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <CartPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <CheckoutPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/payment"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <PaymentPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <OrdersPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Protected General User Routes */}
-            <Route
-              path="/tracking/:orderId"
-              element={
-                <ProtectedRoute>
-                  <OrderTrackingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
 
-            {/* Admin Dedicated Routes */}
-            <Route 
-              path="/admin/orders" 
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminOrdersPage />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected General User Routes */}
+              <Route
+                path="/tracking/:orderId"
+                element={
+                  <ProtectedRoute>
+                    <OrderTrackingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Legacy Fallback Redirects for Old Slugs */}
-            <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/agent" element={<Navigate to="/dashboard" replace />} />
+              {/* Admin Dedicated Routes */}
+              <Route
+                path="/admin/orders"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* 404 Catch All */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+              {/* Legacy Fallback Redirects */}
+              <Route path="/admin" element={<Navigate to="/admin/orders" replace />} />
+              <Route path="/agent" element={<Navigate to="/dashboard" replace />} />
+
+              {/* 404 Catch All */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          )}
         </main>
-        <Footer />
+
+        {!isStoreClosed && <FloatingCartBar />}
+        <BottomNav />
+        <PWAInstallBanner />
       </div>
+
       <Toaster
         position="top-center"
         toastOptions={{
           style: {
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: "'Inter', sans-serif",
             fontWeight: '600',
             fontSize: '13px',
-            borderRadius: '12px',
-            border: '1px solid #E5E7EB',
-            color: '#111827',
+            borderRadius: '16px',
+            border: '1px solid #E2E8F0',
+            color: '#0F172A',
             background: '#FFFFFF',
             boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.05)'
           }
@@ -168,7 +241,9 @@ function AppContent() {
 export default function App() {
   return (
     <Provider store={store}>
-      <AppContent />
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
     </Provider>
   );
 }

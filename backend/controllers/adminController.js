@@ -1,7 +1,12 @@
 import User from '../models/User.js';
 import Order from '../models/Order.js';
+import Product from '../models/Product.js';
+import AdminSubscription from '../models/AdminSubscription.js';
+import { vapidKeys, sendCustomerOrderNotification } from '../services/pushService.js';
+import { validateStatusTransition } from '../utils/orderStateMachine.js';
 
 // @desc    Get all users
+
 // @route   GET /api/admin/users
 // @access  Private/Admin
 export const getAllUsers = async (req, res) => {
@@ -60,10 +65,10 @@ export const getAdminAnalytics = async (req, res) => {
     const totalOrders = await Order.countDocuments({});
     
     const activeOrders = await Order.countDocuments({
-      orderStatus: { $in: ['Placed', 'Accepted', 'Packed', 'Out For Delivery'] }
+      orderStatus: { $in: ['Order Placed', 'Confirmed', 'Preparing', 'Out for Delivery'] }
     });
 
-    const completedOrders = await Order.countDocuments({ orderStatus: 'Completed' });
+    const completedOrders = await Order.countDocuments({ orderStatus: 'Delivered' });
 
     // Aggregate revenues and delivery charges
     const revenueResult = await Order.aggregate([
@@ -97,13 +102,56 @@ const updateOrderStatus = async (req, res, status) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
+    const previousStatus = order.orderStatus;
+
+    // Validate order status transition with state machine
+    try {
+      validateStatusTransition(order.orderStatus, status);
+    } catch (valErr) {
+      return res.status(valErr.statusCode || 400).json({ success: false, message: valErr.message });
+    }
+
+    // Refund stock if admin cancels an order
+    if (status === 'Cancelled' && order.orderStatus !== 'Cancelled') {
+      for (const item of order.products) {
+        if (item.product) {
+          await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+        }
+      }
+    }
+
     order.orderStatus = status;
+
+    try {
+      const adminUser = await User.findById(req.user._id);
+      if (adminUser) {
+        order.assignedAdmin = adminUser._id;
+        order.adminDetails = {
+          name: adminUser.name,
+          phone: adminUser.phone
+        };
+        if (adminUser.location && adminUser.location.latitude && adminUser.location.longitude) {
+          order.agentLocation = {
+            lat: Number(adminUser.location.latitude),
+            lng: Number(adminUser.location.longitude)
+          };
+        } else {
+          order.agentLocation = null;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to assign admin details:', err.message);
+    }
+
     order.trackingHistory.push({
       status,
+      lat: order.agentLocation?.lat || null,
+      lng: order.agentLocation?.lng || null,
       timestamp: new Date()
     });
+
     
-    if (status === 'Completed' && order.paymentStatus !== 'Completed') {
+    if (status === 'Delivered' && order.paymentStatus !== 'Completed') {
         order.paymentStatus = 'Completed';
     }
     if (status === 'Cancelled' && order.paymentStatus === 'Completed') {
@@ -114,6 +162,17 @@ const updateOrderStatus = async (req, res, status) => {
 
     // Populate user details for real-time views
     await order.populate('user', 'name email phone');
+
+    // Trigger Web Push Notification to Customer if transitioning from 'Order Placed' (Pending) to 'Confirmed' or 'Preparing'
+    if (previousStatus === 'Order Placed' && (status === 'Confirmed' || status === 'Preparing')) {
+      sendCustomerOrderNotification(order, 'ORDER_ACCEPTED').catch(err => {
+        console.error('Failed to send order acceptance customer push:', err.message);
+      });
+    } else if (['Out for Delivery', 'Delivered', 'Cancelled'].includes(status) && previousStatus !== status) {
+      sendCustomerOrderNotification(order, status).catch(err => {
+        console.error('Failed to send status push notification:', err.message);
+      });
+    }
 
     // Emit socket events
     const io = req.app.get('socketio');
@@ -131,10 +190,10 @@ const updateOrderStatus = async (req, res, status) => {
       });
 
       // Emit specific status events
-      if (status === 'Accepted') io.to(userRoom).emit('orderAccepted', order);
-      if (status === 'Packed') io.to(userRoom).emit('orderPacked', order);
-      if (status === 'Out For Delivery') io.to(userRoom).emit('orderOutForDelivery', order);
-      if (status === 'Delivered' || status === 'Completed') io.to(userRoom).emit('orderDelivered', order);
+      if (status === 'Confirmed') io.to(userRoom).emit('orderAccepted', order);
+      if (status === 'Preparing') io.to(userRoom).emit('orderPacked', order);
+      if (status === 'Out for Delivery') io.to(userRoom).emit('orderOutForDelivery', order);
+      if (status === 'Delivered') io.to(userRoom).emit('orderDelivered', order);
       if (status === 'Cancelled') io.to(userRoom).emit('orderCancelled', order);
     }
 
@@ -145,8 +204,53 @@ const updateOrderStatus = async (req, res, status) => {
   }
 };
 
-export const acceptOrder = (req, res) => updateOrderStatus(req, res, 'Accepted');
-export const packOrder = (req, res) => updateOrderStatus(req, res, 'Packed');
-export const outForDeliveryOrder = (req, res) => updateOrderStatus(req, res, 'Out For Delivery');
+export const acceptOrder = (req, res) => updateOrderStatus(req, res, 'Confirmed');
+export const packOrder = (req, res) => updateOrderStatus(req, res, 'Preparing');
+export const outForDeliveryOrder = (req, res) => updateOrderStatus(req, res, 'Out for Delivery');
 export const deliverOrder = (req, res) => updateOrderStatus(req, res, 'Delivered');
 export const cancelOrderAdmin = (req, res) => updateOrderStatus(req, res, 'Cancelled');
+
+// @desc    Get VAPID Public Key for web push subscription
+// @route   GET /api/admin/vapid-public-key
+// @access  Private/Admin
+export const getVapidPublicKey = async (req, res) => {
+  try {
+    return res.json({ success: true, publicKey: vapidKeys.publicKey });
+  } catch (error) {
+    console.error('Get Vapid Public Key Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error retrieving VAPID keys' });
+  }
+};
+
+// @desc    Subscribe admin user for push notifications
+// @route   POST /api/admin/subscribe
+// @access  Private/Admin
+export const subscribeAdmin = async (req, res) => {
+  const { subscription } = req.body;
+
+  try {
+    if (!subscription || !subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+      return res.status(400).json({ success: false, message: 'Invalid subscription payload' });
+    }
+
+    // Save or update subscription
+    const updatedSub = await AdminSubscription.findOneAndUpdate(
+      { endpoint: subscription.endpoint },
+      {
+        admin: req.user._id,
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    return res.status(201).json({ success: true, message: 'Subscription saved successfully', subscription: updatedSub });
+  } catch (error) {
+    console.error('Subscribe Admin Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error saving subscription' });
+  }
+};
+

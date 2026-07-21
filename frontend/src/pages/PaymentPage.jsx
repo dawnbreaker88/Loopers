@@ -1,162 +1,107 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { placeOrder } from '../store/orderSlice.js';
+import { useDispatch } from 'react-redux';
 import { clearCartLocal } from '../store/cartSlice.js';
-import PaymentModal from '../components/PaymentModal.jsx';
-import LoadingSpinner from '../components/LoadingSpinner.jsx';
-import { CreditCard, ShieldCheck, ShoppingBag, Truck, CheckCircle, ChevronLeft } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { ShieldCheck, Loader2, ArrowRight, XCircle, CheckCircle2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function PaymentPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  const { orderId, amount } = location.state || {};
+  const [paymentState, setPaymentState] = useState('processing');
 
-  const { items, totalPrice } = useSelector((state) => state.cart);
-  const address = location.state?.address;
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [placing, setPlacing] = useState(false);
-  const [successDetails, setSuccessDetails] = useState(null); // { orderId, txnId, paymentMethod }
-
-  // Redirect back if address is missing
   useEffect(() => {
-    if (!address) {
-      toast.error('Session expired. Please select delivery address again.');
-      navigate('/checkout');
-    } else {
-      // Auto-open checkout modal on load for smooth checkout experience
-      setIsModalOpen(true);
+    if (!orderId) {
+      toast.error('No active order context found');
+      navigate('/');
+      return;
     }
-  }, [address, navigate]);
 
-  if (!address) return null;
-
-  const deliveryFee = 1;
-  const grandTotal = Math.round(totalPrice + deliveryFee);
-
-  const handlePaymentSuccess = async (paymentDetails) => {
-    setIsModalOpen(false);
-    setPlacing(true);
-    
-    try {
-      // Place order in backend database collection
-      const res = await dispatch(placeOrder({
-        address,
-        paymentMethod: paymentDetails.paymentMethod
-      })).unwrap();
-      
-      // Update with payment simulator details in backend if needed
-      // Since placeOrder handles simulated payments already, we just extract details
-      setSuccessDetails({
-        orderId: res._id,
-        txnId: paymentDetails.paymentId || 'COD_PENDING',
-        paymentMethod: paymentDetails.paymentMethod
-      });
-      
-      // Clear shopping cart state locally since order placed
+    const timer = setTimeout(() => {
+      setPaymentState('success');
       dispatch(clearCartLocal());
-      toast.success('Order placed and dispatch engine triggered!');
+      toast.success('Payment verified!');
+      
+      const redirectTimer = setTimeout(() => {
+        navigate(`/tracking/${orderId}`);
+      }, 1500);
 
-    } catch (err) {
-      toast.error('Server error placing your order.');
+      return () => clearTimeout(redirectTimer);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [orderId, navigate, dispatch]);
+
+  const handleCancelPayment = () => {
+    setPaymentState('failed');
+    toast.error('Payment cancelled');
+    setTimeout(() => {
       navigate('/checkout');
-    } finally {
-      setPlacing(false);
-    }
+    }, 1500);
   };
 
-  if (placing) return <LoadingSpinner fullPage message="Processing transaction and dispatching agent..." />;
-
   return (
-    <div class="max-w-md mx-auto py-8">
-      {/* If payment is not yet completed, show checkout placeholder screen */}
-      {!successDetails ? (
-        <div class="bg-white border border-[#E5E7EB] rounded-3xl p-6 shadow-soft space-y-6">
-          <div class="flex items-center gap-2 border-b pb-3.5">
-            <button onClick={() => navigate('/checkout')} class="text-[#6B7280] hover:text-[#111827]"><ChevronLeft class="w-5 h-5" /></button>
-            <h3 class="font-extrabold text-sm text-[#111827] uppercase tracking-wider">Checkout Payment</h3>
+    <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 py-8">
+      
+      <div className="w-full max-w-md bg-white dark:bg-[#1E293B] rounded-3xl border border-[#E2E8F0] dark:border-slate-700/80 shadow-soft p-8 text-center space-y-6 animate-fade-in">
+        
+        <div className="flex justify-center">
+          <div className="bg-[#40A2E3]/10 p-3 rounded-2xl text-[#40A2E3]">
+            <ShieldCheck size={36} />
           </div>
-
-          <div class="space-y-4 text-xs font-semibold text-[#6B7280]">
-            {/* Amount display */}
-            <div class="bg-slate-50 border rounded-2xl p-5 text-center space-y-1">
-              <span class="text-[10px] text-[#6B7280] font-extrabold uppercase tracking-wider block">Total Payable</span>
-              <p class="text-3xl font-black text-[#111827]">₹{grandTotal}</p>
-              <span class="text-[9px] text-[#22C55E] font-black uppercase flex items-center justify-center gap-0.5"><ShieldCheck class="w-3.5 h-3.5" /> 256-bit SSL secure</span>
-            </div>
-
-            {/* Address snippet */}
-            <div class="space-y-1">
-              <span class="text-[10px] font-extrabold uppercase tracking-wider block pl-0.5">Delivering to</span>
-              <p class="text-[#111827] font-bold">{address.houseNumber}, {address.street}</p>
-              <p class="text-[11px]">{address.city}, {address.pincode}</p>
-            </div>
-          </div>
-
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            class="w-full bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold py-4 rounded-xl transition-all shadow-sm shadow-[#22C55E]/20 text-xs uppercase tracking-wider flex items-center justify-center gap-2"
-          >
-            <CreditCard class="w-4 h-4" /> Open Payment Simulator
-          </button>
         </div>
-      ) : (
-        /* Payment Success Panel screen */
-        <div class="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-card text-center space-y-6">
-          <div class="w-16 h-16 bg-[#22C55E]/10 text-[#22C55E] border-2 border-[#22C55E]/15 rounded-full flex items-center justify-center mx-auto shadow-sm">
-            <CheckCircle class="w-10 h-10 stroke-[2.5]" />
-          </div>
 
-          <div class="space-y-1.5">
-            <h2 class="text-xl font-black text-[#111827] uppercase tracking-wide">Payment Successful</h2>
-            <p class="text-xs text-[#6B7280] font-semibold leading-relaxed max-w-xs mx-auto">
-              Your transaction has been settled. The hyperlocal nearest-agent dispatcher is preparing your parcel.
+        <div>
+          <h2 className="text-base font-black text-[#0F172A] dark:text-white tracking-tight">Loopers Payment Gateway</h2>
+          <p className="text-[10px] font-semibold text-[#64748B] dark:text-slate-400 mt-1 font-mono uppercase tracking-wider">
+            TXN: {orderId?.slice(-8).toUpperCase()}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 rounded-2xl py-4">
+          <p className="text-[10px] font-bold text-[#64748B] dark:text-slate-400 uppercase tracking-wider">Amount Paid</p>
+          <p className="text-2xl font-black text-[#0F172A] dark:text-white font-mono mt-1">₹{(amount || 0).toFixed(2)}</p>
+        </div>
+
+        {paymentState === 'processing' && (
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-center space-x-2 text-[#40A2E3]">
+              <Loader2 className="animate-spin" size={20} />
+              <span className="text-xs font-black">Authorizing Payment...</span>
+            </div>
+            <p className="text-[10px] font-semibold text-[#64748B] dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+              Verifying transaction with your payment provider...
             </p>
-          </div>
-
-          {/* Transaction metadata */}
-          <div class="p-4 bg-slate-50 border rounded-2xl text-xs font-semibold text-[#6B7280] text-left space-y-2 font-mono">
-            <div class="flex justify-between">
-              <span>Order ID:</span>
-              <span class="text-[#111827] font-bold">#{successDetails.orderId}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Transaction ID:</span>
-              <span class="text-[#111827] font-bold">{successDetails.txnId}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Method:</span>
-              <span class="text-[#22C55E] font-black">{successDetails.paymentMethod}</span>
-            </div>
-          </div>
-
-          {/* Action CTAs */}
-          <div class="grid grid-cols-2 gap-4">
-            <button 
-              onClick={() => navigate(`/tracking/${successDetails.orderId}`)}
-              class="w-full bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22C55E]/20 text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
+            <button
+              onClick={handleCancelPayment}
+              className="text-[11px] font-bold text-[#EF4444] hover:underline"
             >
-              <Truck class="w-4 h-4" /> Track Order
-            </button>
-            <button 
-              onClick={() => navigate('/orders')}
-              class="w-full bg-white border border-[#E5E7EB] hover:bg-slate-50 text-[#111827] font-extrabold py-3.5 rounded-xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
-            >
-              <ShoppingBag class="w-4 h-4" /> View Orders
+              Cancel Transaction
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Demo Razorpay modal */}
-      <PaymentModal 
-        isOpen={isModalOpen}
-        orderAmount={grandTotal}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={handlePaymentSuccess}
-      />
+        {paymentState === 'success' && (
+          <div className="space-y-3 py-2 text-[#22C55E] animate-fade-in">
+            <CheckCircle2 size={44} className="mx-auto" />
+            <h3 className="text-sm font-black text-[#0F172A] dark:text-white">Payment Confirmed!</h3>
+            <p className="text-[10px] font-semibold text-[#64748B] dark:text-slate-400">Dispatching to tracking...</p>
+          </div>
+        )}
+
+        {paymentState === 'failed' && (
+          <div className="space-y-3 py-2 text-[#EF4444] animate-fade-in">
+            <XCircle size={44} className="mx-auto" />
+            <h3 className="text-sm font-black text-[#0F172A] dark:text-white">Payment Failed</h3>
+            <p className="text-[10px] font-semibold text-[#64748B] dark:text-slate-400">Returning to checkout...</p>
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 }

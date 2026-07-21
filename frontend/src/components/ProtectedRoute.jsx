@@ -1,27 +1,31 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth.js';
-import LoadingSpinner from './LoadingSpinner.jsx';
+import { useSelector } from 'react-redux';
+
+import BrandedLoader from './BrandedLoader.jsx';
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { token, user, isAuthenticated, loading } = useSelector((state) => state.auth);
 
-  if (loading) {
-    return <LoadingSpinner fullPage />;
+  if (loading && token && !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh] bg-[#F8FAFC] dark:bg-[#0F172A]">
+        <BrandedLoader message="Verifying session..." />
+      </div>
+    );
   }
 
-  if (!isAuthenticated) {
+  if (!token || (!loading && !isAuthenticated)) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    // Redirect role-mismatched users to their default dashboard
-    const defaultRedirect = user.role === 'admin' 
-      ? '/admin' 
-      : user.role === 'delivery_agent' 
-        ? '/agent' 
-        : '/dashboard';
-    return <Navigate to={defaultRedirect} replace />;
+  if (allowedRoles && user) {
+    if (!allowedRoles.includes(user.role)) {
+      if (user.role === 'admin') {
+        return <Navigate to="/admin/orders" replace />;
+      }
+      return <Navigate to="/" replace />;
+    }
   }
 
   return children;

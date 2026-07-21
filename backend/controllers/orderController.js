@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import Cart from '../models/Cart.js';
 import Product from '../models/Product.js';
 import { v4 as uuidv4 } from 'uuid';
+import { sendNewOrderNotification } from '../services/pushService.js';
 
 // @desc    Create a new order from cart
 // @route   POST /api/orders/create
@@ -14,60 +15,79 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide address and payment method' });
     }
 
+    // Check if customer already has an active order
+    const existingActiveOrder = await Order.findOne({
+      user: req.user._id,
+      orderStatus: { $in: ['Order Placed', 'Confirmed', 'Preparing', 'Out for Delivery'] }
+    });
+
+    if (existingActiveOrder) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have an active order. Please wait until it is completed before placing another order.'
+      });
+    }
+
     // Get user's cart
     const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
-    
+
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ success: false, message: 'Your cart is empty' });
     }
 
-    // Prepare products array and check stock
+    // Prepare products array and check stock atomically to prevent race conditions
     const orderProducts = [];
+    const reservedProducts = [];
+
     for (const item of cart.items) {
       const product = item.product;
       if (!product) continue;
 
-      if (product.stock < item.quantity) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Not enough stock for ${product.name}. Available: ${product.stock}` 
+      // Atomic decrement with stock availability condition
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: product._id, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        { new: true }
+      );
+
+      if (!updatedProduct) {
+        // Rollback any previously reserved products in this batch
+        for (const reserved of reservedProducts) {
+          await Product.findByIdAndUpdate(reserved.productId, { $inc: { stock: reserved.quantity } });
+        }
+        return res.status(400).json({
+          success: false,
+          message: `Not enough stock available for ${product.name}`
         });
       }
 
-      // Decrement stock
-      product.stock -= item.quantity;
-      await product.save();
-
+      reservedProducts.push({ productId: product._id, quantity: item.quantity });
       const discountedPrice = product.price * (1 - (product.discount || 0) / 100);
 
       orderProducts.push({
         product: product._id,
         name: product.name,
-        price: discountedPrice,
+        price: parseFloat(discountedPrice.toFixed(2)),
         quantity: item.quantity
       });
     }
 
-    // Get user location or default
-    const customerLat = req.user.location && req.user.location.latitude ? req.user.location.latitude : 12.9780;
-    const customerLng = req.user.location && req.user.location.longitude ? req.user.location.longitude : 77.6400;
 
-    // Check if order contains fast food
-    const hasFastFood = cart.items.some(item => item.product && item.product.category === 'Fast Food');
-    let storeLat, storeLng;
-    if (hasFastFood) {
-      storeLat = customerLat + 0.015;
-      storeLng = customerLng + 0.015;
-    } else {
-      storeLat = customerLat - 0.012;
-      storeLng = customerLng - 0.012;
+    // Resolve Customer coordinates directly from captured address or fallback geolocations (no text-based guessing)
+    let customerLat = null;
+    let customerLng = null;
+
+    if (address && address.latitude && address.longitude) {
+      customerLat = Number(address.latitude);
+      customerLng = Number(address.longitude);
+    } else if (req.user.location && req.user.location.latitude && req.user.location.longitude) {
+      customerLat = Number(req.user.location.latitude);
+      customerLng = Number(req.user.location.longitude);
     }
 
-    // Calculate distance and delivery charge
-    const { calculateDistance } = await import('../services/dispatchService.js');
-    const distance = calculateDistance(storeLat, storeLng, customerLat, customerLng);
     const deliveryCharge = 1;
     const finalTotalPrice = parseFloat((cart.totalPrice + deliveryCharge).toFixed(2));
+
 
     // Create unique payment ID for simulation if not COD
     const simulatedPaymentId = paymentMethod !== 'COD' ? `pay_${uuidv4().replace(/-/g, '').slice(0, 16)}` : null;
@@ -78,20 +98,31 @@ export const createOrder = async (req, res) => {
       user: req.user._id,
       products: orderProducts,
       totalPrice: finalTotalPrice,
-      address,
+      address: {
+        name: address.name,
+        phone: address.phone,
+        houseNumber: address.houseNumber,
+        street: address.street,
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        landmark: address.landmark,
+        latitude: customerLat,
+        longitude: customerLng
+      },
+
       paymentMethod,
       paymentStatus,
       paymentId: simulatedPaymentId,
-      orderStatus: 'Placed',
-      storeLocation: { lat: storeLat, lng: storeLng },
+      orderStatus: 'Order Placed',
       customerLocation: { lat: customerLat, lng: customerLng },
-      distance: parseFloat(distance.toFixed(2)),
       deliveryCharge,
+
       trackingHistory: [
         {
-          status: 'Placed',
-          lat: storeLat,
-          lng: storeLng,
+          status: 'Order Placed',
+          lat: customerLat,
+          lng: customerLng,
           timestamp: new Date()
         }
       ]
@@ -102,7 +133,7 @@ export const createOrder = async (req, res) => {
     cart.totalPrice = 0;
     await cart.save();
 
-    console.log(`Order created successfully: ${order._id}`);
+    console.log(`[ORDER] Order Saved: ${order._id}`);
 
     // Populate user details for real-time admin view
     await order.populate('user', 'name email phone');
@@ -110,8 +141,14 @@ export const createOrder = async (req, res) => {
     // Emit socket event to admin room
     const io = req.app.get('socketio');
     if (io) {
-      io.to('admin').emit('orderCreated', order);
+      io.to('admin').emit('new-order', order);
+      console.log(`[ORDER] Socket Event 'new-order' Emitted to room 'admin' for order: ${order._id}`);
     }
+
+    // Trigger Web Push Notification MVP for Admins in background
+    sendNewOrderNotification(order).catch((err) => {
+      console.error('[Order Controller Alert] Web Push notification broadcast error:', err.message);
+    });
 
     return res.status(201).json({
       success: true,
@@ -159,12 +196,14 @@ export const getOrderById = async (req, res) => {
     }
 
     // Check authorization: only the order placing customer or admin can read it
-    const isCustomer = order.user._id.toString() === req.user._id.toString();
+    const orderUserId = order.user?._id ? order.user._id.toString() : order.user?.toString();
+    const isCustomer = orderUserId === req.user._id.toString();
     const isAdminUser = req.user.role === 'admin';
-    
+
     if (!isCustomer && !isAdminUser) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this order' });
     }
+
 
     return res.json({ success: true, order });
   } catch (error) {
@@ -191,22 +230,21 @@ export const cancelOrder = async (req, res) => {
     }
 
     // Check if order can be cancelled (Only in early stages)
-    const nonCancellable = ['Packed', 'Out For Delivery', 'Delivered', 'Completed', 'Cancelled'];
+    const nonCancellable = ['Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
     if (nonCancellable.includes(order.orderStatus)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Order cannot be cancelled in status: ${order.orderStatus}` 
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be cancelled in status: ${order.orderStatus}`
       });
     }
 
-    // Refund inventory stock
+    // Refund inventory stock atomically
     for (const item of order.products) {
-      const product = await Product.findById(item.product);
-      if (product) {
-        product.stock += item.quantity;
-        await product.save();
+      if (item.product) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
       }
     }
+
 
     // No delivery agent to release
 

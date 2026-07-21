@@ -1,143 +1,413 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth.js';
-import { Compass, ShieldCheck, MapPin, ListPlus, ShoppingBag } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchProducts } from '../store/productSlice.js';
+import { fetchCart } from '../store/cartSlice.js';
+import { loginSuccess } from '../store/authSlice.js';
+import ProductCard from '../components/ProductCard.jsx';
+import LocationPromptBanner from '../components/LocationPromptBanner.jsx';
+import api from '../services/api.js';
+import { Search, ChevronRight, Zap, Gift, Sparkles, Compass, MapPin, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const dispatch = useDispatch();
+  const { products, loading: productsLoading } = useSelector((state) => state.products);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
 
-  const handleStartShopping = () => {
-    if (isAuthenticated) {
-      navigate('/products');
-    } else {
-      navigate('/login');
+  const [activeBanner, setActiveBanner] = useState(0);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+
+  // Dynamic CMS Data
+  const [banners, setBanners] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [cmLoading, setCmLoading] = useState(true);
+
+  // Address Selector Modal State
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+
+  // Fallback Promotional banners if database is empty
+  const fallbackBanners = [
+    {
+      _id: '1',
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&h=500&q=80',
+      altText: 'Late Night Study Munchies',
+      redirectType: 'category',
+      redirectTarget: 'Fast Food'
+    },
+    {
+      _id: '2',
+      image: 'https://images.unsplash.com/photo-1578849278619-e73505e9610f?auto=format&fit=crop&w=1200&h=500&q=80',
+      altText: 'Weekend Combo Deals',
+      redirectType: 'category',
+      redirectTarget: 'Snacks'
+    }
+  ];
+
+  // Fetch Banners, Sections, and Categories on mount
+  const fetchCMSData = async () => {
+    try {
+      const [bannersRes, sectionsRes, categoriesRes] = await Promise.all([
+        api.get('/api/banners'),
+        api.get('/api/sections'),
+        api.get('/api/categories') // Fetches active categories only
+      ]);
+
+      if (bannersRes.data.success) {
+        setBanners(bannersRes.data.banners || []);
+      }
+      if (sectionsRes.data.success) {
+        setSections(sectionsRes.data.sections || []);
+      }
+      if (categoriesRes.data.success) {
+        setCategories(categoriesRes.data.categories || []);
+      }
+    } catch (err) {
+      console.warn('Unable to load dynamic content or categories');
+    } finally {
+      setCmLoading(false);
     }
   };
 
-  const handleExplore = () => {
-    navigate('/products');
+  useEffect(() => {
+    dispatch(fetchProducts({}));
+    if (isAuthenticated) {
+      dispatch(fetchCart());
+    }
+    fetchCMSData();
+  }, [dispatch, isAuthenticated]);
+
+  const activeBannersList = banners.length > 0 ? banners : fallbackBanners;
+
+  // Auto scroll banners every 5 seconds
+  useEffect(() => {
+    if (activeBannersList.length === 0) return;
+    const timer = setInterval(() => {
+      setActiveBanner((prev) => (prev + 1) % activeBannersList.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeBannersList.length]);
+
+  // Touch Swipe Handlers for Banners
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.targetTouches[0].clientX;
   };
 
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current - touchEndX.current > 50) {
+      setActiveBanner((prev) => (prev + 1) % activeBannersList.length);
+    }
+    if (touchEndX.current - touchStartX.current > 50) {
+      setActiveBanner((prev) => (prev - 1 + activeBannersList.length) % activeBannersList.length);
+    }
+  };
+
+  // Compact Address Display rule helper
+  const getCompactAddress = () => {
+    if (!isAuthenticated || !user) return 'Set delivery location';
+    const defaultAddress = user.addresses?.find((addr) => addr.isDefault) || user.addresses?.[0];
+    if (!defaultAddress) return 'Add delivery address...';
+    // Display only first line / primary location name (e.g. pincode , Room 304)
+    return `${defaultAddress.name}, ${defaultAddress.houseNumber || ''}`;
+  };
+
+  // Helper gradients for banners
+  const handleBannerClick = (b) => {
+    const type = b.redirectType || (b.category ? 'category' : 'none');
+    const target = b.redirectTarget || b.category;
+
+    if (type === 'category' && target) {
+      navigate(`/products?category=${encodeURIComponent(target)}`);
+    } else if (type === 'product' && target) {
+      navigate(`/products?search=${encodeURIComponent(target)}`);
+    } else if (type === 'external' && target) {
+      window.open(target, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const renderProductSkeleton = () => (
+    <div className="flex space-x-3.5 overflow-x-auto pb-4 scrollbar-hide">
+      {[1, 2, 3, 4].map((n) => (
+        <div key={n} className="w-40 flex-shrink-0 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-slate-700/80 rounded-2xl p-3 animate-pulse space-y-3">
+          <div className="w-full aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+          <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-2/3"></div>
+          <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/3"></div>
+          <div className="h-8 bg-slate-100 dark:bg-slate-800 rounded-xl w-full"></div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div class="space-y-20 py-6">
-      {/* Hero Section */}
-      <div class="text-center max-w-3xl mx-auto space-y-6 pt-8">
-        <div class="inline-flex items-center gap-2 bg-[#22C55E]/10 border border-[#22C55E]/20 text-[#22C55E] px-4.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider">
-          ⚡ Lightning Fast Hyperlocal Grocery Delivery
-        </div>
-        <h1 class="text-4xl sm:text-5xl md:text-6xl font-black text-[#111827] tracking-tight leading-tight sm:leading-none">
-          Fresh groceries.<br/>
-          <span class="text-[#22C55E]">Delivered to your doorstep in minutes.</span>
-        </h1>
-        <p class="text-sm sm:text-md text-[#6B7280] font-semibold leading-relaxed max-w-2xl mx-auto">
-          Order fresh fruits, vegetables, dairy, bakery products, snacks, and daily essentials from your nearest dark store. Enjoy quick delivery and premium service.
-        </p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-          <button 
-            onClick={handleStartShopping}
-            class="w-full sm:w-auto bg-[#22C55E] hover:bg-[#16A34A] text-white font-extrabold text-sm px-8 py-3.5 rounded-xl transition-all shadow-md shadow-[#22C55E]/20 uppercase tracking-wider flex items-center justify-center gap-2"
-          >
-            Start Shopping <ShoppingBag class="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleExplore}
-            class="w-full sm:w-auto bg-white border border-[#E5E7EB] hover:bg-slate-50 text-[#111827] font-extrabold text-sm px-8 py-3.5 rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2"
-          >
-            Explore Products <Compass class="w-4 h-4" />
-          </button>
-        </div>
+    <div className="space-y-4 pb-20">
+
+      {/* 2. Delivery Address Selector (Positioned above search bar) */}
+      <div className="w-full sm:max-w-md">
+        <button
+          onClick={() => isAuthenticated ? setAddressModalOpen(true) : navigate('/login')}
+          className="w-full flex items-center justify-between text-left text-xs font-semibold text-[#0F172A] dark:text-slate-200 bg-sys-surface hover:bg-sys-surface-hover px-4 py-3 rounded-2xl border border-sys-border transition-all shadow-xs truncate"
+        >
+          <div className="flex items-center min-w-0 truncate mr-1">
+            <MapPin size={16} className="text-[#40A2E3] flex-shrink-0 mr-2" />
+            <span className="truncate text-xs font-extrabold uppercase tracking-wide">
+              {getCompactAddress()}
+            </span>
+          </div>
+          <ChevronDown size={16} className="text-[#64748B] flex-shrink-0 ml-1" />
+        </button>
       </div>
 
-      {/* Feature Cards Grid */}
-      <div class="space-y-8">
-        <div class="text-center space-y-2">
-          <h2 class="text-2xl font-black text-[#111827]">Supercharge your shopping experience</h2>
-          <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">Engineered for speed, built for convenience</p>
-        </div>
+      {/* Location Permission Prompt Banner */}
+      <LocationPromptBanner />
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div class="bg-white border border-[#E5E7EB] p-6 rounded-2xl shadow-soft space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
-              <ShoppingBag class="w-5 h-5" />
-            </div>
-            <h3 class="font-extrabold text-[#111827] text-md">Fresh Groceries</h3>
-            <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              Choose from a curated local selection of handpicked fresh fruits, premium vegetables, and pantry items.
-            </p>
-          </div>
-
-          <div class="bg-white border border-[#E5E7EB] p-6 rounded-2xl shadow-soft space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
-              <ListPlus class="w-5 h-5" />
-            </div>
-            <h3 class="font-extrabold text-[#111827] text-md">Easy Ordering</h3>
-            <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              Easily customize item quantities, add/remove items in your cart, and checkout with single-click simplicity.
-            </p>
-          </div>
-
-          <div class="bg-white border border-[#E5E7EB] p-6 rounded-2xl shadow-soft space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
-              <MapPin class="w-5 h-5" />
-            </div>
-            <h3 class="font-extrabold text-[#111827] text-md">Live GPS Tracking</h3>
-            <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              Watch your delivery agent travel in real-time on our interactive Leaflet maps with live status updates.
-            </p>
-          </div>
-
-          <div class="bg-white border border-[#E5E7EB] p-6 rounded-2xl shadow-soft space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-[#22C55E]/10 text-[#22C55E] flex items-center justify-center">
-              <ShieldCheck class="w-5 h-5" />
-            </div>
-            <h3 class="font-extrabold text-[#111827] text-md">Secure Deliveries</h3>
-            <p class="text-xs text-[#6B7280] font-semibold leading-relaxed">
-              MERN architecture secures your details, including simulated UPI and card checkout transactions.
-            </p>
-          </div>
-        </div>
+      {/* 3. Search Bar (Positioned directly below the address selector) */}
+      <div
+        onClick={() => navigate('/products')}
+        className="relative flex items-center w-full bg-sys-surface hover:bg-sys-surface-hover border border-sys-border rounded-2xl px-4 py-3 cursor-pointer transition-all shadow-xs group"
+      >
+        <Search size={18} className="text-[#40A2E3] mr-3 group-hover:scale-110 transition-transform" />
+        <span className="text-xs font-semibold text-[#64748B] dark:text-slate-400 select-none">
+          Search snacks, drinks, stationery, instant noodles...
+        </span>
+        <span className="ml-auto text-[10px] font-extrabold text-[#40A2E3] bg-[#40A2E3]/10 px-2 py-0.5 rounded-full">
+          SEARCH
+        </span>
       </div>
 
-      {/* How it Works Section */}
-      <div class="bg-white border border-[#E5E7EB] rounded-3xl p-8 md:p-12 shadow-soft space-y-8">
-        <div class="text-center space-y-2">
-          <h2 class="text-2xl font-black text-[#111827]">How Loopers Works</h2>
-          <p class="text-xs text-[#6B7280] font-bold uppercase tracking-wider">Five simple steps to lightning fast checkout</p>
+      {/* 4. Pure Marketing Creative Promotional Banners */}
+      {activeBannersList.length > 0 && (
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="relative w-full aspect-[2.4/1] max-h-64 sm:max-h-80 overflow-hidden rounded-3xl border border-sys-border shadow-soft select-none bg-slate-900 group"
+        >
+          {activeBannersList.map((b, idx) => {
+            const isClickable = (b.redirectType && b.redirectType !== 'none') || b.category;
+            return (
+              <div
+                key={b._id || idx}
+                onClick={() => handleBannerClick(b)}
+                className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${
+                  isClickable ? 'cursor-pointer' : 'cursor-default'
+                } ${
+                  idx === activeBanner
+                    ? 'opacity-100 translate-x-0 scale-100 z-10'
+                    : 'opacity-0 translate-x-8 scale-95 z-0'
+                }`}
+              >
+                <img
+                  src={b.image}
+                  alt={b.altText || 'Promotional Banner'}
+                  loading={idx === 0 ? 'eager' : 'lazy'}
+                  className="w-full h-full object-cover rounded-3xl"
+                />
+              </div>
+            );
+          })}
+
+          {/* Pagination Indicators */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5 z-20">
+            {activeBannersList.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveBanner(idx);
+                }}
+                className={`h-1.5 rounded-full transition-all ${
+                  idx === activeBanner ? 'w-6 bg-white shadow-md' : 'w-1.5 bg-white/50'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              ></button>
+            ))}
+          </div>
         </div>
+      )}
 
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 text-center relative">
-          <div class="space-y-2 relative">
-            <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">1</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Explore Catalog</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Browse through categories or search for specific items.</p>
+      {/* 5. Categories Grid (Dynamically fetched from backend database) */}
+      {categories.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex justify-between items-center px-1">
+            <div className="flex items-center space-x-1.5">
+              <Compass size={16} className="text-[#40A2E3]" />
+              <h3 className="text-sm font-black text-[#0F172A] dark:text-white">Categories</h3>
+            </div>
+            <button
+              onClick={() => navigate('/products')}
+              className="text-xs font-extrabold text-[#40A2E3] hover:underline flex items-center"
+            >
+              <span>View All</span>
+              <ChevronRight size={14} />
+            </button>
           </div>
-          
-          <div class="space-y-2">
-            <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">2</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Add to Cart</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Select items and adjust quantities directly to your cart.</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            {categories.map((cat) => (
+              <div
+                key={cat._id}
+                onClick={() => navigate(`/products?category=${cat.name}`)}
+                className="bg-sys-surface border border-sys-border rounded-2xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-[1.03] active:scale-95 group text-center shadow-xs"
+              >
+                <img 
+                  src={
+                    (cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('/')))
+                      ? cat.icon 
+                      : ({
+                          'Snacks': 'https://cdn-icons-png.flaticon.com/512/2553/2553691.png',
+                          'Beverages': 'https://cdn-icons-png.flaticon.com/512/2405/2405479.png',
+                          'Dairy': 'https://cdn-icons-png.flaticon.com/512/3050/3050158.png',
+                          'Groceries': 'https://cdn-icons-png.flaticon.com/512/3724/3724788.png',
+                          'Household': 'https://cdn-icons-png.flaticon.com/512/995/995053.png',
+                          'Fast Food': 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png',
+                          'Vegetables': 'https://cdn-icons-png.flaticon.com/512/2329/2329865.png',
+                          'Fruits': 'https://cdn-icons-png.flaticon.com/512/3194/3194766.png',
+                          'Electronics': 'https://cdn-icons-png.flaticon.com/512/3659/3659899.png',
+                        }[cat.name] || 'https://cdn-icons-png.flaticon.com/512/3724/3724788.png')
+                  } 
+                  alt={cat.name} 
+                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain mb-1.5 group-hover:scale-110 transition-transform filter drop-shadow-xs" 
+                />
+                <span className="text-[11px] font-bold text-[#0F172A] dark:text-slate-200 truncate w-full group-hover:text-[#40A2E3]">
+                  {cat.name}
+                </span>
+              </div>
+            ))}
           </div>
+        </section>
+      )}
 
-          <div class="space-y-2">
-            <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">3</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Confirm Order</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Review your cart details and select a delivery address.</p>
-          </div>
+      {/* 6. Product Sections (Dynamic home sections fetched from backend) */}
+      {cmLoading ? (
+        <div className="space-y-6">
+          {renderProductSkeleton()}
+          {renderProductSkeleton()}
+        </div>
+      ) : sections.length > 0 ? (
+        sections.map((section) => {
+          if (!section.isActive || !section.products || section.products.length === 0) return null;
+          return (
+            <section key={section._id} className="space-y-3 animate-fade-in">
+              <div className="flex justify-between items-center px-1">
+                <div className="flex items-center space-x-1.5">
+                  <Sparkles size={16} className="text-[#40A2E3] fill-current" />
+                  <h3 className="text-sm font-black text-[#0F172A] dark:text-white uppercase tracking-wider">
+                    {section.title}
+                  </h3>
+                </div>
+              </div>
 
-          <div class="space-y-2">
-            <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">4</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Checkout Order</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Make simulated Razorpay payments instantly.</p>
-          </div>
+              <div className="flex space-x-3.5 overflow-x-auto pb-4 px-0.5 scrollbar-hide snap-x">
+                {section.products.map((product) => {
+                  if (!product) return null;
+                  return (
+                    <div key={product._id} className="w-40 sm:w-44 flex-shrink-0 snap-start">
+                      <ProductCard product={product} />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })
+      ) : (
+        /* Fallback Static Sections if dynamic seeding failed */
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <div className="flex items-center space-x-1.5">
+                <Zap size={16} className="text-[#40A2E3] fill-current" />
+                <h3 className="text-sm font-black text-[#0F172A] dark:text-white">Trending</h3>
+              </div>
+            </div>
+            <div className="flex space-x-3.5 overflow-x-auto pb-4 px-0.5 scrollbar-hide snap-x">
+              {products.slice(0, 6).map((product) => (
+                <div key={product._id} className="w-40 sm:w-44 flex-shrink-0 snap-start">
+                  <ProductCard product={product} />
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
 
-          <div class="space-y-2">
-            <span class="w-8 h-8 rounded-full bg-[#22C55E] text-white font-extrabold flex items-center justify-center mx-auto shadow-sm">5</span>
-            <h4 class="font-extrabold text-[#111827] text-sm">Track Courier</h4>
-            <p class="text-[11px] text-[#6B7280] font-semibold leading-relaxed">Watch the nearest rider move on Leaflet maps.</p>
+      {/* Address Switcher Modal (Triggered by Address Selector above search bar) */}
+      {addressModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white dark:bg-[#1E293B] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-800 animate-fade-in space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-[#0F172A] dark:text-white">Select Delivery Address</h3>
+              <button
+                onClick={() => setAddressModalOpen(false)}
+                className="text-xs font-bold text-[#64748B] dark:text-slate-400 hover:text-[#0F172A] dark:hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+
+            {user?.addresses && user.addresses.length > 0 ? (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {user.addresses.map((addr) => (
+                  <button
+                    key={addr._id}
+                    onClick={async () => {
+                      try {
+                        await api.put(`/api/auth/address/${addr._id}`, { isDefault: true });
+                        // Trigger hot reload profile update on backend success
+                        const profileRes = await api.get('/api/auth/profile');
+                        if (profileRes.data.success) {
+                          dispatch(loginSuccess({ token: localStorage.getItem('token'), user: profileRes.data.user }));
+                        }
+                        setAddressModalOpen(false);
+                        toast.success(`Delivery address set to ${addr.name}`);
+                      } catch (err) {
+                        toast.error('Failed to change active location');
+                      }
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition-all text-xs flex justify-between items-center ${addr.isDefault
+                      ? 'border-[#40A2E3] bg-[#40A2E3]/5 text-[#0F172A] dark:text-white font-extrabold'
+                      : 'border-[#E2E8F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#64748B] dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                  >
+                    <div>
+                      <p className="font-bold text-[#0F172A] dark:text-white">{addr.name}</p>
+                      <p className="text-[11px] mt-0.5">{addr.houseNumber}, {addr.street}, {addr.city}</p>
+                    </div>
+                    {addr.isDefault && (
+                      <span className="text-[10px] font-bold text-[#40A2E3] uppercase bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full border border-[#40A2E3]/20 shadow-xs">
+                        Default
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-[#64748B] dark:text-slate-400 text-center my-4">
+                No saved addresses. Add one in your Profile settings.
+              </p>
+            )}
+
+            <div className="pt-4 border-t border-[#E2E8F0] dark:border-slate-700 flex justify-end">
+              <button
+                onClick={() => {
+                  setAddressModalOpen(false);
+                  navigate('/profile');
+                }}
+                className="text-xs font-bold bg-[#40A2E3] text-white px-4 py-2 rounded-xl shadow-md hover:opacity-90 active:scale-95 transition-all"
+              >
+                Manage Locations
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
     </div>
   );
 }

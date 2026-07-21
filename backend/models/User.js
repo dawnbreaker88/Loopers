@@ -10,8 +10,11 @@ const addressSchema = new mongoose.Schema({
   state: { type: String, required: true },
   pincode: { type: String, required: true },
   landmark: { type: String },
+  latitude: { type: Number },
+  longitude: { type: Number },
   isDefault: { type: Boolean, default: false }
 }, { _id: true });
+
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -28,7 +31,12 @@ const userSchema = new mongoose.Schema({
   addresses: [addressSchema]
 }, { timestamps: true });
 
+// Indexes for query performance
+userSchema.index({ role: 1, status: 1 });
+userSchema.index({ createdAt: -1 });
+
 // Hash password before saving
+
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   try {

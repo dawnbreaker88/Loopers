@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { io } from 'socket.io-client';
+import { getSocket, subscribeToSocketEvents } from '../services/socketService.js';
 
 export const useSocket = (orderId, onStatusUpdate, onLocationUpdate) => {
   const socketRef = useRef(null);
@@ -8,47 +8,45 @@ export const useSocket = (orderId, onStatusUpdate, onLocationUpdate) => {
   const userId = user?.id || user?._id;
 
   useEffect(() => {
-    // Connect socket
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin || 'http://localhost:5000';
-    const socket = io(socketUrl);
+    const socket = getSocket();
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('Socket connected successfully:', socket.id);
+    if (socket && socket.connected) {
       if (userId) {
         socket.emit('join-user-room', userId);
       }
       if (orderId) {
         socket.emit('join-order-room', orderId);
       }
-    });
+    }
 
-    socket.on('order-update', (data) => {
-      console.log('Order update received via socket:', data);
-      if (onStatusUpdate) {
-        onStatusUpdate(data);
+    const unsubscribe = subscribeToSocketEvents((eventName, data) => {
+      if (eventName === 'orderUpdated' || eventName === 'order-status-update') {
+        if (!orderId || data?._id === orderId || data?.orderId === orderId) {
+          if (onStatusUpdate) onStatusUpdate(data);
+        }
       }
-      if (onLocationUpdate) {
-        onLocationUpdate(data);
+      if (eventName === 'riderLocationUpdate' || eventName === 'riderLocationUpdated') {
+        if (!orderId || data?.orderId === orderId) {
+          if (onLocationUpdate) onLocationUpdate(data);
+        }
       }
     });
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-        console.log('Socket disconnected on clean up');
-      }
+      unsubscribe();
     };
   }, [orderId, userId, onStatusUpdate, onLocationUpdate]);
 
   const emitAgentLocation = (agentId, orderId, lat, lng) => {
-    if (socketRef.current) {
-      socketRef.current.emit('updateAgentLocation', { agentId, orderId, lat, lng });
+    const socket = socketRef.current || getSocket();
+    if (socket) {
+      socket.emit('updateAgentLocation', { agentId, orderId, lat, lng });
     }
   };
 
   return {
-    socket: socketRef.current,
+    socket: socketRef.current || getSocket(),
     emitAgentLocation,
   };
 };

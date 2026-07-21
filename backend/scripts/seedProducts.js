@@ -412,85 +412,6 @@ const products = [
     image: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=400&q=80'
   },
 
-  // Pharmacy
-  {
-    name: 'Crocin Advance 650mg',
-    description: 'Fast pain relief and fever reducing tablets containing Paracetamol.',
-    category: 'Pharmacy',
-    price: 30,
-    discount: 0,
-    stock: 150,
-    unit: '15 tablets',
-    brand: 'Crocin',
-    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Calpol 650mg',
-    description: 'Doctor recommended Paracetamol 650mg for body aches and fever.',
-    category: 'Pharmacy',
-    price: 35,
-    discount: 0,
-    stock: 120,
-    unit: '15 tablets',
-    brand: 'Calpol',
-    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Dabur Honitus Cough Syrup',
-    description: 'Herbal honey-based cough remedy for sore throat relief.',
-    category: 'Pharmacy',
-    price: 90,
-    discount: 5,
-    stock: 80,
-    unit: '100 ml',
-    brand: 'Dabur',
-    image: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Benadryl Cough Syrup',
-    description: 'Fast acting syrup for dry cough and throat irritation.',
-    category: 'Pharmacy',
-    price: 150,
-    discount: 8,
-    stock: 60,
-    unit: '100 ml',
-    brand: 'Benadryl',
-    image: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Dettol Antiseptic Liquid',
-    description: 'First aid antiseptic liquid for wound cleaning and disinfection.',
-    category: 'Pharmacy',
-    price: 100,
-    discount: 5,
-    stock: 100,
-    unit: '250 ml',
-    brand: 'Dettol',
-    image: 'https://images.unsplash.com/photo-1607619056574-7b8f30413736?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Band-Aid Fast Healing',
-    description: 'Washproof plastic adhesive bandages for small cuts and wounds.',
-    category: 'Pharmacy',
-    price: 20,
-    discount: 0,
-    stock: 200,
-    unit: '10 units',
-    brand: 'Johnson & Johnson',
-    image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=400&q=80'
-  },
-  {
-    name: 'Premium First Aid Kit',
-    description: 'Complete emergency medical kit containing gauze, scissors, tape, and wipes.',
-    category: 'Pharmacy',
-    price: 450,
-    discount: 10,
-    stock: 30,
-    unit: '1 Kit',
-    brand: 'Dettol',
-    image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=400&q=80'
-  },
-
   // Electronics
   {
     name: 'Portronics USB-C Cable',
@@ -667,7 +588,6 @@ const seedDatabase = async () => {
         Vegetables: ['Onion', 'Tomato', 'Potato', 'Garlic', 'Ginger', 'Coriander', 'Chilli', 'Mint', 'Lemon', 'Carrot', 'Spinach', 'Broccoli', 'Capsicum', 'Cabbage', 'Cauliflower'],
         Fruits: ['Apple', 'Banana', 'Orange', 'Mango', 'Grapes', 'Papaya', 'Watermelon', 'Pineapple', 'Kiwi', 'Pomegranate', 'Guava', 'Strawberry'],
         Electronics: ['Cable', 'Charger', 'Earphones', 'Power Bank', 'Mouse', 'Keyboard', 'Pendrive', 'Adapter', 'Screen Guard', 'Smart Watch'],
-        Pharmacy: ['Paracetamol', 'Cough Syrup', 'Antiseptic', 'Band-Aid', 'First Aid Kit', 'Vitamin C', 'Pain Relief Spray', 'Thermometer', 'Digestive Drops', 'Eye Drops'],
         Dairy: ['Milk', 'Curd', 'Cheese', 'Butter', 'Paneer', 'Yogurt', 'Ghee', 'Ice Cream', 'Buttermilk', 'Cream'],
         Snacks: ['Chips', 'Biscuits', 'Namkeen', 'Popcorn', 'Chocolates', 'Nuts', 'Nachos', 'Wafers', 'Cookies', 'Bhujia'],
         Beverages: ['Soft Drink', 'Juice', 'Tea', 'Coffee', 'Energy Drink', 'Water', 'Soda', 'Squash', 'Syrup', 'Mocktail'],
