@@ -35,10 +35,13 @@ import {
   User as UserIcon,
   Check,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  FileText,
+  Bell
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt.jsx';
+import ImageUploader from '../components/common/ImageUploader.jsx';
 
 export default function AdminOrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,6 +74,94 @@ export default function AdminOrdersPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+
+  const loadNotifications = () => {
+    try {
+      const stored = localStorage.getItem('admin_notifications');
+      if (stored) {
+        setNotifications(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const handleUpdate = () => {
+      loadNotifications();
+    };
+    window.addEventListener('admin-notifications-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('admin-notifications-updated', handleUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    const searchId = searchParams.get('search');
+    if (searchId) {
+      setOrderSearchQuery(searchId);
+    }
+  }, [searchParams]);
+
+  const handleDownloadPDF = async (url, filename) => {
+    try {
+      if (!url) {
+        toast.error('PDF URL is missing');
+        return;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Network response was not ok');
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success('Download started');
+    } catch (err) {
+      console.error('Fetch download failed, trying attachment fallback:', err);
+      let downloadUrl = url;
+      if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+        downloadUrl = url.replace('/upload/', '/upload/fl_attachment/');
+      }
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.download = filename || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleMarkAllAsRead = () => {
+    const updated = notifications.map(n => ({ ...n, unread: false }));
+    setNotifications(updated);
+    localStorage.setItem('admin_notifications', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('admin-notifications-updated'));
+  };
+
+  const handleNotificationClick = (notif) => {
+    const updated = notifications.map(n => n.id === notif.id ? { ...n, unread: false } : n);
+    setNotifications(updated);
+    localStorage.setItem('admin_notifications', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('admin-notifications-updated'));
+    setShowNotificationsDropdown(false);
+    
+    setOrderSearchQuery(notif.orderId);
+    setActiveTab('orders');
+  };
+
+  const unreadCount = notifications.filter(n => n.unread).length;
+  const [isProductImageUploading, setIsProductImageUploading] = useState(false);
+  const [isBannerImageUploading, setIsBannerImageUploading] = useState(false);
   const [timeRange, setTimeRange] = useState('weekly'); // 'daily', 'weekly', 'monthly'
 
   // Admin Profile Form
@@ -139,28 +230,64 @@ export default function AdminOrdersPage() {
     isActive: true
   });
 
+  // Print Pricing States
+  const [printPricing, setPrintPricing] = useState({
+    bwSingle: 2,
+    bwDouble: 3,
+    colorSingle: 10,
+    colorDouble: 15,
+    binding: {
+      spiral: 30,
+      hard: 70,
+      soft: 20,
+      stickFile: 15,
+      transparentFile: 10,
+      clampFile: 15
+    },
+    extras: {
+      frontTransparentSheet: 10,
+      backHardSheet: 10,
+      lamination: 20,
+      coverPage: 15,
+      pageNumbering: 5,
+      watermark: 5
+    },
+    paperSizes: {
+      A4: 0,
+      A3: 5,
+      Legal: 3,
+      Letter: 2
+    },
+    paperQualities: {
+      normal: 0,
+      premium: 5,
+      glossy: 10
+    },
+    tax: 0,
+    discount: 0
+  });
+  const [savingPricing, setSavingPricing] = useState(false);
+
   // Fetch initial data based on active tab
   useEffect(() => {
     fetchData();
   }, [activeTab]);
 
-  // Socket.io subscription for Admin toast notifications
+  // Socket.io subscription for Admin toast notifications & auto-refresh
   useEffect(() => {
     if (!token) return;
 
     const unsubscribe = subscribeToSocketEvents((eventName, newOrder) => {
-      if (eventName === 'new-order') {
-        toast.success(`New Order Received: ${newOrder?.customId || `LPR-${newOrder?._id?.slice(-6).toUpperCase()}`}`, {
-          duration: 5000,
-          position: 'top-right'
-        });
+      if (eventName === 'new-order' || eventName === 'newOrder') {
+        // Automatically refresh data on new order arrival
+        fetchData(false);
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [token]);
+  }, [token, activeTab]);
 
   const fetchData = async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -215,6 +342,11 @@ export default function AdminOrdersPage() {
         }
       }
 
+      if (isManual || activeTab === 'print_pricing') {
+        const res = await api.get('/api/pricing');
+        if (res.data.success && res.data.pricing) setPrintPricing(res.data.pricing);
+      }
+
       if (isManual) {
         toast.success('Dashboard data refreshed successfully');
       }
@@ -237,6 +369,24 @@ export default function AdminOrdersPage() {
       }
     } catch (err) {
       toast.error('Failed to update store availability');
+    }
+  };
+
+  // Save Print Pricing configurations
+  const handleSavePrintPricing = async (e) => {
+    e?.preventDefault();
+    setSavingPricing(true);
+    try {
+      const res = await api.put('/api/pricing', printPricing);
+      if (res.data.success) {
+        setPrintPricing(res.data.pricing);
+        toast.success('Print rates updated successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update print rates');
+    } finally {
+      setSavingPricing(false);
     }
   };
 
@@ -558,6 +708,85 @@ export default function AdminOrdersPage() {
               <RefreshCw size={13} className={refreshing ? 'animate-spin text-primary-500' : ''} />
               <span className="hidden sm:inline">Refresh Data</span>
             </button>
+
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                className="p-1.5 px-2.5 rounded-lg bg-sys-surface-secondary text-sys-text-secondary hover:text-primary-500 hover:bg-sys-border transition-all flex items-center space-x-1.5 text-xs font-bold relative cursor-pointer"
+                title="Recent Order Notifications"
+              >
+                <Bell size={13} className={unreadCount > 0 ? "animate-bounce text-primary-500" : ""} />
+                <span className="hidden sm:inline">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-sys-error text-[8px] font-extrabold text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotificationsDropdown && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowNotificationsDropdown(false)}></div>
+                  <div className="absolute right-0 mt-2 w-72 bg-sys-surface border border-sys-border rounded-2xl shadow-xl py-2.5 z-40 animate-fade-in text-xs">
+                    <div className="px-3.5 py-1 border-b border-sys-border mb-1.5 flex justify-between items-center">
+                      <span className="font-black text-sys-text-primary">Recent Orders</span>
+                      {unreadCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllAsRead}
+                          className="text-[9px] font-black text-primary-500 hover:underline cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-60 overflow-y-auto space-y-1.5 px-2">
+                      {notifications.length > 0 ? (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-start gap-2 ${
+                              notif.unread
+                                ? 'bg-primary-500/5 hover:bg-primary-500/10 border border-primary-500/20'
+                                : 'hover:bg-sys-surface-secondary border border-transparent'
+                            }`}
+                          >
+                            <div className="mt-0.5 shrink-0 text-sm">
+                              {notif.orderType === 'Printout' ? '📄' : '🛒'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start">
+                                <span className="font-extrabold text-sys-text-primary block truncate max-w-[70%]">
+                                  {notif.customerName}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-400 shrink-0">
+                                  ₹{Number(notif.total).toFixed(0)}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-sys-text-secondary mt-0.5">
+                                Order #{notif.customId?.replace('LPR-', '') || notif.orderId?.slice(-6).toUpperCase()}
+                              </p>
+                              {notif.orderType === 'Printout' && notif.pages > 0 && (
+                                <p className="text-[9px] text-[#40A2E3] font-semibold mt-0.5">
+                                  {notif.pages} Pages
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6 text-slate-400 font-semibold text-[11px]">
+                          No recent notifications
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           <p className="text-xs text-sys-text-secondary mt-0.5">
             Order and Content management system.
@@ -618,6 +847,15 @@ export default function AdminOrdersPage() {
           >
             <Layers size={14} />
             <span>Categories</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('print_pricing')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 whitespace-nowrap ${activeTab === 'print_pricing' ? 'bg-primary-500 text-white shadow-xs' : 'text-sys-text-secondary hover:text-sys-text-primary'
+              }`}
+          >
+            <FileText size={14} />
+            <span>Print Rates</span>
           </button>
 
 
@@ -870,9 +1108,54 @@ export default function AdminOrdersPage() {
                       <div className="space-y-1 text-xs">
                         <p className="font-bold text-sys-text-primary mb-1">Items Ordered:</p>
                         {order.products?.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sys-text-secondary">
-                            <span>{item.quantity}x {item.name}</span>
-                            <span className="font-mono">₹{(item.price * item.quantity).toFixed(2)}</span>
+                          <div key={idx} className="pb-2 border-b border-sys-border last:border-0 last:pb-0">
+                            <div className="flex justify-between text-sys-text-secondary">
+                              <span className="font-semibold">{item.quantity}x {item.name}</span>
+                              <span className="font-mono font-bold text-sys-text-primary">₹{(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                            {item.type === 'printout' && (
+                              <div className="mt-1 ml-4 bg-sys-surface-secondary/70 p-2.5 rounded-xl border border-sys-border space-y-1 text-[11px] text-sys-text-secondary">
+                                <p className="font-bold text-primary-500 text-xs">Printout Specifications:</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                                  <p><span className="font-extrabold text-sys-text-primary">Pages:</span> {item.pages}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Copies:</span> {item.copies || 1}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Print Mode:</span> {item.printMode === 'single' ? 'Single Sided' : 'Double Sided'}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Paper Size:</span> {item.paperSize || 'A4'}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Paper Quality:</span> {item.paperQuality || 'Standard (75 GSM)'}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Binding:</span> {item.binding || 'None'}</p>
+                                  <p><span className="font-extrabold text-sys-text-primary">Orientation:</span> {item.orientation || 'Portrait'}</p>
+                                  {item.extras && item.extras.length > 0 && (
+                                    <p className="col-span-2"><span className="font-extrabold text-sys-text-primary">Extras:</span> {item.extras.join(', ')}</p>
+                                  )}
+                                </div>
+                                {item.specialInstructions && (
+                                  <p className="text-[10px] text-amber-500 italic bg-amber-500/5 p-1 rounded-md mt-1">
+                                    <span className="font-extrabold block">Special Instructions:</span> "{item.specialInstructions}"
+                                  </p>
+                                )}
+                                <div className="mt-2 pt-2 border-t border-sys-border">
+                                  {item.pdfUrl ? (
+                                    <div className="space-y-1">
+                                      <p><span className="font-extrabold text-sys-text-primary">PDF Name:</span> {item.pdfName || 'document.pdf'}</p>
+                                      <p><span className="font-extrabold text-sys-text-primary">File Size:</span> {item.pdfSize || 'N/A'}</p>
+                                      <p><span className="font-extrabold text-sys-text-primary">Upload Time:</span> {new Date(order.createdAt).toLocaleString('en-IN')}</p>
+                                      <div className="pt-2 flex items-center justify-between">
+                                        <span className="font-mono text-[9px] truncate max-w-[50%]">{item.pdfName || 'document.pdf'}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDownloadPDF(item.pdfUrl, item.pdfName || 'document.pdf')}
+                                          className="bg-primary-500 hover:bg-primary-650 text-white font-extrabold text-[10px] px-3 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                                        >
+                                          <span>📄 Download PDF</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[10px] font-bold text-sys-error">PDF unavailable</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -897,7 +1180,16 @@ export default function AdminOrdersPage() {
                             </button>
                           )}
 
-                          {['Order Placed', 'Confirmed'].includes(order.orderStatus) && (
+                          {order.orderStatus === 'Confirmed' && order.products?.some(p => p.type === 'printout') && (
+                            <button
+                              onClick={() => handleUpdateOrderStatus(order._id, 'print')}
+                              className="bg-indigo-650 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all"
+                            >
+                              Mark Printing
+                            </button>
+                          )}
+
+                          {['Order Placed', 'Confirmed', 'Printing'].includes(order.orderStatus) && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order._id, 'pack')}
                               className="bg-primary-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all"
@@ -906,10 +1198,10 @@ export default function AdminOrdersPage() {
                             </button>
                           )}
 
-                          {order.orderStatus === 'Preparing' && (
+                          {['Preparing', 'Printing'].includes(order.orderStatus) && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order._id, 'out-for-delivery')}
-                              className="bg-purple-600 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all"
+                              className="bg-purple-650 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all"
                             >
                               Mark Out for Delivery
                             </button>
@@ -1671,6 +1963,237 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
+      {/* TAB 8: PRINT RATES MANAGEMENT */}
+      {activeTab === 'print_pricing' && (
+        <form onSubmit={handleSavePrintPricing} className="space-y-6 animate-fade-in text-xs">
+          
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-sys-surface border border-sys-border p-4 rounded-2xl shadow-xs">
+            <div>
+              <h3 className="text-sm font-bold text-sys-text-primary uppercase tracking-wider">
+                Print Rates Configurator
+              </h3>
+              <p className="text-[11px] text-sys-text-secondary mt-0.5">
+                Set real-time rates for color/black-and-white printing, binding options, sheet extras, and paper qualities.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingPricing}
+              className="bg-primary-500 hover:bg-primary-650 text-white text-xs font-black px-6 py-2.5 rounded-xl shadow-md flex items-center space-x-1.5 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+            >
+              <Save size={16} />
+              <span>{savingPricing ? 'Saving...' : 'Save Configuration'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Standard Page Rates */}
+            <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4">
+              <h4 className="text-xs font-black text-sys-text-primary uppercase tracking-wider flex items-center border-b border-sys-border pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2"></span>
+                Standard Page Printing Rates (₹ per page)
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Black & White (Single Sided)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={printPricing.bwSingle}
+                    onChange={(e) => setPrintPricing({ ...printPricing, bwSingle: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Black & White (Double Sided)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={printPricing.bwDouble}
+                    onChange={(e) => setPrintPricing({ ...printPricing, bwDouble: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Color (Single Sided)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={printPricing.colorSingle}
+                    onChange={(e) => setPrintPricing({ ...printPricing, colorSingle: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Color (Double Sided)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={printPricing.colorDouble}
+                    onChange={(e) => setPrintPricing({ ...printPricing, colorDouble: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Paper Size & Quality Surcharges */}
+            <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4">
+              <h4 className="text-xs font-black text-sys-text-primary uppercase tracking-wider flex items-center border-b border-sys-border pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 mr-2"></span>
+                Paper Configuration Surcharges (₹)
+              </h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <span className="font-extrabold text-sys-text-secondary uppercase text-[10px] block mb-2">Paper Sizes (relative to A4 base)</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.keys(printPricing.paperSizes || {}).map((size) => (
+                      <div key={size}>
+                        <label className="font-bold text-sys-text-primary block mb-1">{size} Size</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={printPricing.paperSizes[size]}
+                          onChange={(e) => {
+                            const newSizes = { ...printPricing.paperSizes, [size]: parseFloat(e.target.value) || 0 };
+                            setPrintPricing({ ...printPricing, paperSizes: newSizes });
+                          }}
+                          className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="font-extrabold text-sys-text-secondary uppercase text-[10px] block mb-2">Paper Qualities (relative to Normal base)</span>
+                  <div className="grid grid-cols-3 gap-3">
+                    {Object.keys(printPricing.paperQualities || {}).map((quality) => (
+                      <div key={quality}>
+                        <label className="font-bold text-sys-text-primary block mb-1 capitalize">{quality}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={printPricing.paperQualities[quality]}
+                          onChange={(e) => {
+                            const newQualities = { ...printPricing.paperQualities, [quality]: parseFloat(e.target.value) || 0 };
+                            setPrintPricing({ ...printPricing, paperQualities: newQualities });
+                          }}
+                          className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Binding Costs */}
+            <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4">
+              <h4 className="text-xs font-black text-sys-text-primary uppercase tracking-wider flex items-center border-b border-sys-border pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>
+                Binding Surcharges (₹ per book)
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {Object.keys(printPricing.binding || {}).map((opt) => (
+                  <div key={opt}>
+                    <label className="font-bold text-sys-text-primary block mb-1 capitalize">
+                      {opt.replace(/([A-Z])/g, ' $1')}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={printPricing.binding[opt]}
+                      onChange={(e) => {
+                        const newBinding = { ...printPricing.binding, [opt]: parseFloat(e.target.value) || 0 };
+                        setPrintPricing({ ...printPricing, binding: newBinding });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Extras/Add-ons Costs */}
+            <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4">
+              <h4 className="text-xs font-black text-sys-text-primary uppercase tracking-wider flex items-center border-b border-sys-border pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span>
+                Extras & Add-on Surcharges (₹)
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {Object.keys(printPricing.extras || {}).map((extra) => (
+                  <div key={extra}>
+                    <label className="font-bold text-sys-text-primary block mb-1 capitalize">
+                      {extra.replace(/([A-Z])/g, ' $1')}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={printPricing.extras[extra]}
+                      onChange={(e) => {
+                        const newExtras = { ...printPricing.extras, [extra]: parseFloat(e.target.value) || 0 };
+                        setPrintPricing({ ...printPricing, extras: newExtras });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tax & Discount */}
+            <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4 md:col-span-2">
+              <h4 className="text-xs font-black text-sys-text-primary uppercase tracking-wider flex items-center border-b border-sys-border pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span>
+                Taxation & Promotional Discount Defaults (%)
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Standard Print GST / Tax (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={printPricing.tax}
+                    onChange={(e) => setPrintPricing({ ...printPricing, tax: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-sys-text-primary block mb-1">Default Discount (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={printPricing.discount}
+                    onChange={(e) => setPrintPricing({ ...printPricing, discount: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </form>
+      )}
+
       {/* Product Edit/Create Modal */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
@@ -1759,13 +2282,12 @@ export default function AdminOrdersPage() {
               </div>
 
               <div>
-                <label className="font-bold text-sys-text-primary block mb-1">Image URL</label>
-                <input
-                  type="text"
+                <label className="font-bold text-sys-text-primary block mb-1">Product Image</label>
+                <ImageUploader
                   value={productForm.image}
-                  onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary"
+                  onChange={(url) => setProductForm({ ...productForm, image: url })}
+                  onUploadingStateChange={setIsProductImageUploading}
+                  folder="products"
                 />
               </div>
 
@@ -1777,11 +2299,12 @@ export default function AdminOrdersPage() {
                 >
                   Cancel
                 </button>
-                <button
+                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold bg-primary-500 text-white rounded-xl shadow-md"
+                  disabled={isProductImageUploading}
+                  className="px-4 py-2 text-xs font-bold bg-primary-500 text-white rounded-xl shadow-md disabled:opacity-50"
                 >
-                  Save Product
+                  {isProductImageUploading ? 'Uploading Image...' : 'Save Product'}
                 </button>
               </div>
             </form>
@@ -1804,14 +2327,12 @@ export default function AdminOrdersPage() {
 
             <form onSubmit={handleSaveBanner} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-sys-text-primary block mb-1">Banner Creative Image URL * (Recommended 1200×500 / 2.4:1 ratio)</label>
-                <input
-                  type="text"
-                  required
+                <label className="font-bold text-sys-text-primary block mb-1">Banner Creative Image * (Recommended 1200×500 / 2.4:1 ratio)</label>
+                <ImageUploader
                   value={bannerForm.image}
-                  onChange={(e) => setBannerForm({ ...bannerForm, image: e.target.value })}
-                  placeholder="https://images.unsplash.com/... or uploaded URL"
-                  className="w-full p-2.5 rounded-xl border border-sys-border bg-sys-surface-secondary text-sys-text-primary focus:outline-none"
+                  onChange={(url) => setBannerForm({ ...bannerForm, image: url })}
+                  onUploadingStateChange={setIsBannerImageUploading}
+                  folder="banners"
                 />
               </div>
 
@@ -1926,9 +2447,10 @@ export default function AdminOrdersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold bg-primary-500 text-white rounded-xl shadow-md"
+                  disabled={isBannerImageUploading}
+                  className="px-4 py-2 text-xs font-bold bg-primary-500 text-white rounded-xl shadow-md disabled:opacity-50"
                 >
-                  Save Banner Asset
+                  {isBannerImageUploading ? 'Uploading Image...' : 'Save Banner Asset'}
                 </button>
               </div>
             </form>

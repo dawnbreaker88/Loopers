@@ -324,6 +324,19 @@ export default function CheckoutPage() {
 
         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
           {items.map((item) => {
+            if (item.type === 'printout') {
+              return (
+                <div key={item._id} className="flex justify-between items-center text-xs">
+                  <span className="truncate text-[#0F172A] dark:text-slate-200 font-medium max-w-[70%]">
+                    {item.quantity}x PDF Print ({item.pdfName})
+                  </span>
+                  <span className="font-mono font-bold text-[#0F172A] dark:text-white">
+                    ₹{((item.price || 0) * item.quantity).toFixed(2)}
+                  </span>
+                </div>
+              );
+            }
+
             const product = item.product;
             if (!product) return null;
             const displayPrice = product.discount

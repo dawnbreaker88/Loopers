@@ -191,6 +191,7 @@ const updateOrderStatus = async (req, res, status) => {
 
       // Emit specific status events
       if (status === 'Confirmed') io.to(userRoom).emit('orderAccepted', order);
+      if (status === 'Printing') io.to(userRoom).emit('orderPrinting', order);
       if (status === 'Preparing') io.to(userRoom).emit('orderPacked', order);
       if (status === 'Out for Delivery') io.to(userRoom).emit('orderOutForDelivery', order);
       if (status === 'Delivered') io.to(userRoom).emit('orderDelivered', order);
@@ -205,6 +206,7 @@ const updateOrderStatus = async (req, res, status) => {
 };
 
 export const acceptOrder = (req, res) => updateOrderStatus(req, res, 'Confirmed');
+export const printOrder = (req, res) => updateOrderStatus(req, res, 'Printing');
 export const packOrder = (req, res) => updateOrderStatus(req, res, 'Preparing');
 export const outForDeliveryOrder = (req, res) => updateOrderStatus(req, res, 'Out for Delivery');
 export const deliverOrder = (req, res) => updateOrderStatus(req, res, 'Delivered');

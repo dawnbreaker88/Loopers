@@ -40,6 +40,31 @@ export const createOrder = async (req, res) => {
     const reservedProducts = [];
 
     for (const item of cart.items) {
+      if (item.type === 'printout') {
+        orderProducts.push({
+          product: null,
+          type: 'printout',
+          name: item.pdfName || 'Printout PDF',
+          price: item.price,
+          quantity: item.quantity || 1,
+          pdfUrl: item.pdfUrl,
+          pdfName: item.pdfName,
+          pdfSize: item.pdfSize,
+          pages: item.pages,
+          copies: item.copies || 1,
+          bwPages: item.bwPages,
+          colorPages: item.colorPages,
+          binding: item.binding,
+          extras: item.extras || [],
+          specialInstructions: item.specialInstructions,
+          orientation: item.orientation,
+          paperSize: item.paperSize,
+          paperQuality: item.paperQuality,
+          printMode: item.printMode
+        });
+        continue;
+      }
+
       const product = item.product;
       if (!product) continue;
 
@@ -66,6 +91,7 @@ export const createOrder = async (req, res) => {
 
       orderProducts.push({
         product: product._id,
+        type: 'product',
         name: product.name,
         price: parseFloat(discountedPrice.toFixed(2)),
         quantity: item.quantity
@@ -142,7 +168,27 @@ export const createOrder = async (req, res) => {
     const io = req.app.get('socketio');
     if (io) {
       io.to('admin').emit('new-order', order);
-      console.log(`[ORDER] Socket Event 'new-order' Emitted to room 'admin' for order: ${order._id}`);
+      const hasPrintout = order.products.some(p => p.type === 'printout');
+      const orderType = hasPrintout ? 'Printout' : 'Normal Product';
+      let pages = 0;
+      if (hasPrintout) {
+        order.products.forEach(p => {
+          if (p.type === 'printout') {
+            pages += (p.pages || 0) * (p.copies || 1);
+          }
+        });
+      }
+      const newOrderPayload = {
+        orderId: order._id,
+        customId: order.customId || `LPR-${order._id.toString().slice(-6).toUpperCase()}`,
+        customerName: order.user?.name || order.address?.name || 'Customer',
+        orderType,
+        total: order.totalPrice,
+        pages,
+        createdAt: order.createdAt
+      };
+      io.to('admin').emit('newOrder', newOrderPayload);
+      console.log(`[ORDER] Socket Event 'new-order' and 'newOrder' Emitted to room 'admin' for order: ${order._id}`);
     }
 
     // Trigger Web Push Notification MVP for Admins in background
@@ -240,7 +286,7 @@ export const cancelOrder = async (req, res) => {
 
     // Refund inventory stock atomically
     for (const item of order.products) {
-      if (item.product) {
+      if (item.product && item.type !== 'printout') {
         await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
       }
     }

@@ -15,7 +15,8 @@ export const seedContentManagement = async () => {
       { name: 'Fast Food', description: 'Burgers, pizzas, fries & rolls', icon: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png', isActive: true },
       { name: 'Vegetables', description: 'Fresh farm vegetables', icon: 'https://cdn-icons-png.flaticon.com/512/2329/2329865.png', isActive: true },
       { name: 'Fruits', description: 'Fresh fruits', icon: 'https://cdn-icons-png.flaticon.com/512/3194/3194766.png', isActive: true },
-      { name: 'Electronics', description: 'Chargers, headphones, cables', icon: 'https://cdn-icons-png.flaticon.com/512/3659/3659899.png', isActive: true }
+      { name: 'Electronics', description: 'Chargers, headphones, cables', icon: 'https://cdn-icons-png.flaticon.com/512/3659/3659899.png', isActive: true },
+      { name: 'Printouts', description: 'Document printing service', icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041975.png', isActive: true }
     ];
 
     for (const cat of categoryIconMap) {

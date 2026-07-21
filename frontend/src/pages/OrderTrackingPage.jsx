@@ -6,7 +6,7 @@ import L from 'leaflet';
 import orderService from '../services/orderService.js';
 import { MapPin, Phone, Clock, CheckCircle2, ChevronLeft, AlertCircle, Hourglass, ShieldCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { subscribeToSocketEvents } from '../services/socketService.js';
+import { subscribeToSocketEvents, getSocket } from '../services/socketService.js';
 
 // Custom Leaflet Icons
 const createMarkerIcon = (emoji, color) => {
@@ -54,6 +54,11 @@ export default function OrderTrackingPage() {
   useEffect(() => {
     fetchOrderDetails();
     const interval = setInterval(() => fetchOrderDetails(false), 5000);
+
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('join-order-room', orderId);
+    }
 
     const unsubscribe = subscribeToSocketEvents((eventName, data) => {
       if ((eventName === 'orderUpdated' || eventName === 'order-status-update' || eventName === 'riderLocationUpdate') && data) {
@@ -318,13 +323,37 @@ export default function OrderTrackingPage() {
 
         <div className="space-y-2">
           {order.products?.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center text-xs">
-              <span className="text-[#0F172A] dark:text-slate-200 font-medium">
-                {item.quantity}x {item.name}
-              </span>
-              <span className="font-mono font-bold text-[#0F172A] dark:text-white">
-                ₹{(item.price * item.quantity).toFixed(2)}
-              </span>
+            <div key={idx} className="flex flex-col justify-center text-xs pb-2 border-b border-slate-100/50 dark:border-slate-800/50 last:border-0 last:pb-0">
+              <div className="flex justify-between items-center">
+                <span className="text-[#0F172A] dark:text-slate-200 font-medium">
+                  {item.quantity}x {item.name}
+                </span>
+                <span className="font-mono font-bold text-[#0F172A] dark:text-white">
+                  ₹{(item.price * item.quantity).toFixed(2)}
+                </span>
+              </div>
+              {item.type === 'printout' && (
+                <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 space-y-0.5 font-semibold">
+                  <p>
+                    Config: {item.pages} pages • {item.copies} copies • {item.printMode === 'single' ? 'Single side' : 'Double side'} • {item.binding !== 'none' ? item.binding : 'No binding'}
+                  </p>
+                  {item.specialInstructions && (
+                    <p className="text-[9px] text-[#40A2E3] italic font-bold">
+                      Instructions: "{item.specialInstructions}"
+                    </p>
+                  )}
+                  {item.pdfUrl && (
+                    <a
+                      href={item.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#40A2E3] hover:underline font-extrabold inline-flex items-center gap-1 mt-1"
+                    >
+                      View Uploaded Document
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

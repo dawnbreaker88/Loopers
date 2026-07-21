@@ -1,10 +1,26 @@
 import mongoose from 'mongoose';
 
 const orderProductSchema = new mongoose.Schema({
-  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  name: { type: String, required: true },
+  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
+  type: { type: String, enum: ['product', 'printout'], default: 'product' },
+  name: { type: String, required: false },
   price: { type: Number, required: true },
-  quantity: { type: Number, required: true }
+  quantity: { type: Number, required: true },
+  // Printout properties
+  pdfUrl: { type: String },
+  pdfName: { type: String },
+  pdfSize: { type: String },
+  pages: { type: Number },
+  copies: { type: Number },
+  bwPages: { type: Number },
+  colorPages: { type: Number },
+  binding: { type: String },
+  extras: [{ type: String }],
+  specialInstructions: { type: String },
+  orientation: { type: String },
+  paperSize: { type: String },
+  paperQuality: { type: String },
+  printMode: { type: String }
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
@@ -33,6 +49,7 @@ const orderSchema = new mongoose.Schema({
     enum: [
       'Order Placed',
       'Confirmed',
+      'Printing',
       'Preparing',
       'Out for Delivery',
       'Delivered',

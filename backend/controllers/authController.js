@@ -413,8 +413,13 @@ export const updateUserLocation = async (req, res) => {
       if (io) {
         activeOrders.forEach(order => {
           const userRoom = order.user._id ? order.user._id.toString() : order.user.toString();
+          const orderRoom = order._id.toString();
           io.to(userRoom).emit('orderUpdated', order);
           io.to(userRoom).emit('riderLocationUpdate', {
+            orderId: order._id,
+            agentLocation: { lat: latitude, lng: longitude }
+          });
+          io.to(orderRoom).emit('riderLocationUpdate', {
             orderId: order._id,
             agentLocation: { lat: latitude, lng: longitude }
           });

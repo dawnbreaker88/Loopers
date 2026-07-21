@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts } from '../store/productSlice.js';
 import ProductCard from '../components/ProductCard.jsx';
@@ -8,6 +8,7 @@ import { Search, Package, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ProductResultsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { products, loading } = useSelector((state) => state.products);
 
@@ -88,6 +89,10 @@ export default function ProductResultsPage() {
   }, [dispatch, selectedCategory, searchQuery]);
 
   const handleCategorySelect = (catName) => {
+    if (catName === 'Printouts') {
+      navigate('/printouts');
+      return;
+    }
     setSelectedCategory(catName);
     const params = new URLSearchParams(searchParams);
     if (catName === 'All') {

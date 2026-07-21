@@ -252,7 +252,13 @@ export default function LandingPage() {
             {categories.map((cat) => (
               <div
                 key={cat._id}
-                onClick={() => navigate(`/products?category=${cat.name}`)}
+                onClick={() => {
+                  if (cat.name === 'Printouts') {
+                    navigate('/printouts');
+                  } else {
+                    navigate(`/products?category=${cat.name}`);
+                  }
+                }}
                 className="bg-sys-surface border border-sys-border rounded-2xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-[1.03] active:scale-95 group text-center shadow-xs"
               >
                 <img 

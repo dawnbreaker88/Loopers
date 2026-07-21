@@ -39,33 +39,58 @@ const playNotificationChime = () => {
   }
 };
 
-// HTML5 Native Browser Notification Trigger
-const triggerBrowserNotification = (order) => {
-  try {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const orderId = order?.customId || (order?._id ? `LPR-${order._id.slice(-6).toUpperCase()}` : 'New Order');
-    const customerName = order?.user?.name || order?.address?.name || 'Customer';
-    const total = order?.totalPrice ? ` (₹${order.totalPrice.toFixed(2)})` : '';
+let notificationAudio = null;
+let audioUnlocked = false;
 
-    const title = `🚨 New Order Placed: ${orderId}`;
-    const options = {
-      body: `${customerName} placed an order${total}. Tap to view pending orders.`,
-      icon: '/favicon.ico',
-      tag: `new-order-${order?._id || Date.now()}`,
-      renotify: true
-    };
+try {
+  notificationAudio = new Audio('https://upload.wikimedia.org/wikipedia/commons/d/d4/Notification_sound_1.mp3');
+  notificationAudio.load();
+} catch (e) {
+  console.warn('[SocketService] Audio init failed:', e);
+}
 
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then((reg) => {
-        reg.showNotification(title, options);
-      });
-    } else {
-      new Notification(title, options);
-    }
-  } catch (err) {
-    console.warn('[SocketService] Browser notification trigger error:', err.message);
+const unlockAudio = () => {
+  if (audioUnlocked) return;
+  if (notificationAudio) {
+    notificationAudio.play().then(() => {
+      notificationAudio.pause();
+      notificationAudio.currentTime = 0;
+      audioUnlocked = true;
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+      console.log('[SocketService] Audio context unlocked');
+    }).catch(() => {});
+  } else {
+    audioUnlocked = true;
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
   }
 };
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+}
+
+let isPlayingSound = false;
+const playNotificationSound = () => {
+  if (isPlayingSound) return;
+  isPlayingSound = true;
+  setTimeout(() => { isPlayingSound = false; }, 2000);
+
+  if (notificationAudio && audioUnlocked) {
+    notificationAudio.currentTime = 0;
+    notificationAudio.play()
+      .catch((err) => {
+        console.warn('[SocketService] Preloaded audio failed, playing chime:', err.message);
+        playNotificationChime();
+      });
+  } else {
+    playNotificationChime();
+  }
+};
+
+
 
 export const initSocket = (user, token) => {
   if (socket) {
@@ -97,9 +122,14 @@ export const initSocket = (user, token) => {
   socket.on('new-order', (order) => {
     console.log('[SocketService] Received new-order:', order?._id);
     store.dispatch(newOrderReceived(order));
-    playNotificationChime();
-    triggerBrowserNotification(order);
+    playNotificationSound();
     listeners.forEach(cb => cb('new-order', order));
+  });
+
+  socket.on('newOrder', (data) => {
+    console.log('[SocketService] Received newOrder:', data?.orderId);
+    playNotificationSound();
+    listeners.forEach(cb => cb('newOrder', data));
   });
 
   socket.on('orderUpdated', (order) => {
