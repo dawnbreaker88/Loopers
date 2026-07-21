@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db.js';
 import User from './models/User.js';
+import Order from './models/Order.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { JWT_SECRET } from './middleware/auth.js';
 
@@ -22,6 +23,9 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
 import bannerRoutes from './routes/bannerRoutes.js';
 import sectionRoutes from './routes/sectionRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
+import pricingRoutes from './routes/pricingRoutes.js';
+import printoutRoutes from './routes/printoutRoutes.js';
 import { seedContentManagement } from './utils/seedCM.js';
 
 
@@ -82,6 +86,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/store', storeRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/sections', sectionRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/printouts', printoutRoutes);
 
 
 
@@ -154,10 +161,26 @@ io.on('connection', (socket) => {
   });
 
   // Join Order Room (for agent tracking updates on specific orders)
-  socket.on('join-order-room', (orderId) => {
-    if (orderId) {
-      socket.join(orderId);
-      console.log(`Socket ${socket.id} joined order room: ${orderId}`);
+  socket.on('join-order-room', async (orderId) => {
+    if (orderId && socket.user) {
+      try {
+        const order = await Order.findById(orderId);
+        if (order) {
+          const userIdStr = socket.user._id.toString();
+          const orderUserStr = order.user.toString();
+          const isAdmin = socket.user.role === 'admin';
+          
+          if (isAdmin || userIdStr === orderUserStr) {
+            socket.join(orderId);
+            console.log(`Socket ${socket.id} authorized and joined order room: ${orderId}`);
+          } else {
+            console.warn(`[Security Alert] Unauthorized join-order-room attempt for order ${orderId} by user ${socket.user.email}`);
+            socket.emit('error', { message: 'Unauthorized access to this order room' });
+          }
+        }
+      } catch (err) {
+        console.error('Error joining order room:', err.message);
+      }
     }
   });
 

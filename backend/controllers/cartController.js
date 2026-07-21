@@ -8,7 +8,10 @@ const recalculateCart = async (cart) => {
   await cart.populate('items.product');
   
   cart.items.forEach(item => {
-    if (item.product) {
+    if (item.type === 'printout') {
+      // For printout items, the unit price is calculated dynamically
+      totalPrice += (item.price || 0) * (item.quantity || 1);
+    } else if (item.product) {
       const discountedPrice = item.product.price * (1 - (item.product.discount || 0) / 100);
       totalPrice += discountedPrice * item.quantity;
     }
@@ -36,11 +39,11 @@ export const getCart = async (req, res) => {
   }
 };
 
-// @desc    Add single or multiple products to cart
+// @desc    Add single or multiple products/printouts to cart
 // @route   POST /api/cart/add
 // @access  Private
 export const addToCart = async (req, res) => {
-  const { productId, quantity, items } = req.body; // Supports bulk add or single add
+  const { productId, quantity, items, type } = req.body; // Supports bulk add, single add, or printout
 
   try {
     let cart = await Cart.findOne({ user: req.user._id });
@@ -48,13 +51,59 @@ export const addToCart = async (req, res) => {
       cart = await Cart.create({ user: req.user._id, items: [], totalPrice: 0 });
     }
 
-    // Process bulk items list
-    if (items && Array.isArray(items)) {
+    if (type === 'printout') {
+      const {
+        pdfUrl, pdfName, pdfSize, pages, copies, bwPages, colorPages,
+        binding, extras, price, specialInstructions, orientation,
+        paperSize, paperQuality, printMode
+      } = req.body;
+
+      if (!pdfUrl || !pages || !price) {
+        return res.status(400).json({ success: false, message: 'Missing printout parameters' });
+      }
+
+      // Check if this exact printout already exists in the cart to increment quantity
+      const existingIndex = cart.items.findIndex(item => 
+        item.type === 'printout' && 
+        item.pdfUrl === pdfUrl && 
+        item.binding === binding &&
+        item.printMode === printMode &&
+        item.paperSize === paperSize &&
+        item.paperQuality === paperQuality &&
+        JSON.stringify(item.extras.sort()) === JSON.stringify((extras || []).sort())
+      );
+
+      if (existingIndex > -1) {
+        cart.items[existingIndex].quantity += quantity || 1;
+        cart.items[existingIndex].copies += copies || 1;
+      } else {
+        cart.items.push({
+          type: 'printout',
+          pdfUrl,
+          pdfName,
+          pdfSize,
+          pages,
+          copies: copies || 1,
+          bwPages,
+          colorPages,
+          binding,
+          extras: extras || [],
+          price,
+          specialInstructions,
+          orientation,
+          paperSize,
+          paperQuality,
+          printMode,
+          quantity: quantity || 1
+        });
+      }
+    } else if (items && Array.isArray(items)) {
+      // Process bulk items list
       for (const item of items) {
         const prod = await Product.findById(item.productId);
         if (!prod) continue;
 
-        const existingIndex = cart.items.findIndex(i => i.product.toString() === item.productId);
+        const existingIndex = cart.items.findIndex(i => i.product && i.product.toString() === item.productId);
         const qty = item.quantity || 1;
 
         if (existingIndex > -1) {
@@ -71,7 +120,7 @@ export const addToCart = async (req, res) => {
       }
 
       const qty = quantity || 1;
-      const existingIndex = cart.items.findIndex(item => item.product.toString() === productId);
+      const existingIndex = cart.items.findIndex(item => item.product && item.product.toString() === productId);
 
       if (existingIndex > -1) {
         cart.items[existingIndex].quantity += qty;
@@ -96,11 +145,12 @@ export const addToCart = async (req, res) => {
 // @route   PUT /api/cart/update
 // @access  Private
 export const updateCartItem = async (req, res) => {
-  const { productId, quantity } = req.body;
+  const { productId, cartItemId, quantity } = req.body;
+  const targetId = productId || cartItemId;
 
   try {
-    if (!productId || quantity === undefined) {
-      return res.status(400).json({ success: false, message: 'Please provide productId and quantity' });
+    if (!targetId || quantity === undefined) {
+      return res.status(400).json({ success: false, message: 'Please provide productId/cartItemId and quantity' });
     }
 
     const cart = await Cart.findOne({ user: req.user._id });
@@ -108,7 +158,12 @@ export const updateCartItem = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    const itemIndex = cart.items.findIndex(item => item.product.toString() === productId);
+    const itemIndex = cart.items.findIndex(item => {
+      if (item.type === 'printout') {
+        return item._id.toString() === targetId;
+      }
+      return item.product && item.product.toString() === targetId;
+    });
 
     if (itemIndex === -1) {
       return res.status(404).json({ success: false, message: 'Item not found in cart' });
@@ -135,11 +190,12 @@ export const updateCartItem = async (req, res) => {
 // @route   DELETE /api/cart/remove
 // @access  Private
 export const removeFromCart = async (req, res) => {
-  const { productId } = req.body;
+  const { productId, cartItemId } = req.body;
+  const targetId = productId || cartItemId;
 
   try {
-    if (!productId) {
-      return res.status(400).json({ success: false, message: 'Please provide productId' });
+    if (!targetId) {
+      return res.status(400).json({ success: false, message: 'Please provide productId or cartItemId' });
     }
 
     const cart = await Cart.findOne({ user: req.user._id });
@@ -147,7 +203,12 @@ export const removeFromCart = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    cart.items = cart.items.filter(item => item.product.toString() !== productId);
+    cart.items = cart.items.filter(item => {
+      if (item.type === 'printout') {
+        return item._id.toString() !== targetId;
+      }
+      return !item.product || item.product.toString() !== targetId;
+    });
 
     await recalculateCart(cart);
     await cart.save();

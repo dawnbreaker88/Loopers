@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCart, updateCartQty, removeCartItem } from '../store/cartSlice.js';
 import { fetchOrders } from '../store/orderSlice.js';
-import { ShoppingBag, ArrowRight, Trash2, Plus, Minus, ShieldCheck, ChevronLeft, AlertCircle } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Trash2, Plus, Minus, ShieldCheck, ChevronLeft, AlertCircle, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function CartPage() {
@@ -24,21 +24,21 @@ export default function CartPage() {
     ['Order Placed', 'Confirmed', 'Preparing', 'Out for Delivery'].includes(o.orderStatus)
   );
 
-  const handleIncrement = async (productId, currentQty) => {
+  const handleIncrement = async (itemId, currentQty) => {
     try {
-      await dispatch(updateCartQty({ productId, quantity: currentQty + 1 })).unwrap();
+      await dispatch(updateCartQty({ productId: itemId, quantity: currentQty + 1 })).unwrap();
     } catch (err) {
       toast.error(err || 'Failed to update quantity');
     }
   };
 
-  const handleDecrement = async (productId, currentQty) => {
+  const handleDecrement = async (itemId, currentQty) => {
     try {
       if (currentQty === 1) {
-        await dispatch(removeCartItem(productId)).unwrap();
+        await dispatch(removeCartItem(itemId)).unwrap();
         toast.success('Item removed from cart');
       } else {
-        await dispatch(updateCartQty({ productId, quantity: currentQty - 1 })).unwrap();
+        await dispatch(updateCartQty({ productId: itemId, quantity: currentQty - 1 })).unwrap();
       }
     } catch (err) {
       toast.error(err || 'Failed to update quantity');
@@ -94,6 +94,63 @@ export default function CartPage() {
       {/* Cart Items List */}
       <div className="bg-sys-surface border border-sys-border rounded-2xl p-4 space-y-4 shadow-xs">
         {items.map((item) => {
+          if (item.type === 'printout') {
+            const itemTotal = (item.price || 0) * (item.quantity || 1);
+            return (
+              <div
+                key={item._id}
+                className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0"
+              >
+                {/* Printout Thumbnail */}
+                <div className="w-14 h-14 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <FileText className="text-red-500" size={24} />
+                </div>
+
+                {/* Printout Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-extrabold uppercase bg-red-100 dark:bg-red-950/40 text-red-650 dark:text-red-400 px-1.5 py-0.5 rounded-md shrink-0">
+                      PDF Print
+                    </span>
+                    <h4 className="text-xs font-bold text-[#0F172A] dark:text-white truncate">
+                      {item.pdfName || 'Printout Document'}
+                    </h4>
+                  </div>
+                  <p className="text-[10px] text-[#64748B] dark:text-slate-400 mt-1 leading-relaxed font-semibold">
+                    {item.pages} pages • {item.copies} copies • {item.printMode === 'single' ? 'Single side' : 'Double side'} • {item.binding !== 'none' ? item.binding : 'No binding'}
+                  </p>
+                  {item.specialInstructions && (
+                    <p className="text-[9px] text-[#40A2E3] italic truncate mt-0.5">
+                      "{item.specialInstructions}"
+                    </p>
+                  )}
+                  <p className="text-xs font-black text-[#40A2E3] mt-1 font-mono">
+                    ₹{itemTotal.toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Quantity Adjuster */}
+                <div className="flex items-center bg-[#40A2E3] text-white rounded-xl p-0.5 shadow-xs shrink-0 self-center">
+                  <button
+                    onClick={() => handleDecrement(item._id, item.quantity)}
+                    className="w-6 h-6 flex items-center justify-center hover:bg-black/15 rounded-lg transition-colors active:scale-90"
+                  >
+                    {item.quantity === 1 ? <Trash2 size={12} /> : <Minus size={12} strokeWidth={3} />}
+                  </button>
+                  <span className="text-xs font-extrabold px-2 font-mono">
+                    {item.quantity}
+                  </span>
+                  <button
+                    onClick={() => handleIncrement(item._id, item.quantity)}
+                    className="w-6 h-6 flex items-center justify-center hover:bg-black/15 rounded-lg transition-colors active:scale-90"
+                  >
+                    <Plus size={12} strokeWidth={3} />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           const product = item.product;
           if (!product) return null;
 

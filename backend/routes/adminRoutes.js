@@ -3,6 +3,7 @@ import {
   getAllUsers, 
   updateUserStatus, 
   acceptOrder,
+  printOrder,
   packOrder,
   outForDeliveryOrder,
   deliverOrder,
@@ -42,6 +43,7 @@ router.get('/analytics/geographic', getGeographicAnalytics);
 
 // Order Lifecycle routes
 router.post('/orders/:id/accept', acceptOrder);
+router.post('/orders/:id/print', printOrder);
 router.post('/orders/:id/pack', packOrder);
 router.post('/orders/:id/out-for-delivery', outForDeliveryOrder);
 router.post('/orders/:id/deliver', deliverOrder);
