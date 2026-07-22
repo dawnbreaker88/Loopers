@@ -2,7 +2,6 @@ import express from 'express';
 import { 
   registerUser, 
   loginUser, 
-  googleLogin, 
   getUserProfile, 
   logoutUser, 
   addAddress,
@@ -22,7 +21,6 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/refresh', refreshToken);
-router.post('/google', googleLogin);
 
 router.post('/logout', protect, logoutUser);
 router.get('/profile', protect, getUserProfile);

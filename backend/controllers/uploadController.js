@@ -12,7 +12,8 @@ export const uploadImage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No image file provided.' });
     }
 
-    const folderParam = req.query.folder || req.body.folder || 'uploads';
+    const rawFolder = req.query.folder || req.body.folder || 'uploads';
+    const folderParam = String(rawFolder).replace(/[^a-zA-Z0-9_-]/g, '');
     const cloudinaryFolder = `loopers/${folderParam}`;
 
     const uploadToCloudinary = (fileBuffer) => {

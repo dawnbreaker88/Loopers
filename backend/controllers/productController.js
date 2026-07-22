@@ -12,12 +12,12 @@ export const getProducts = async (req, res) => {
       isActive: { $ne: false }
     };
 
-    if (category && category !== 'All') {
-      query.category = category;
+    if (category && String(category) !== 'All') {
+      query.category = String(category);
     }
 
     if (search) {
-      query.name = { $regex: search, $options: 'i' };
+      query.name = { $regex: String(search), $options: 'i' };
     }
 
     const products = await Product.find(query).sort({ createdAt: -1 });
@@ -57,7 +57,7 @@ export const createProduct = async (req, res) => {
   try {
     const product = await Product.create({
       name,
-      description: description && description.trim() !== '' ? description : `${name} - Fresh Campus Product`,
+      description: description && description.trim() !== '' ? description : `${name} - Fresh Product`,
       category,
       price: Number(price),
       discount: Number(discount) || 0,

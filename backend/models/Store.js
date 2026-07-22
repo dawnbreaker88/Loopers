@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const storeSchema = new mongoose.Schema({
-  storeName: { type: String, default: 'Loopers Campus Dark Store' },
+  storeName: { type: String, default: 'Loopers Store' },
   openingTime: { type: String, default: '07:00 AM' },
   closingTime: { type: String, default: '02:00 AM' },
   isOpen: { type: Boolean, default: true },

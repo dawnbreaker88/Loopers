@@ -163,14 +163,10 @@ const updateOrderStatus = async (req, res, status) => {
     // Populate user details for real-time views
     await order.populate('user', 'name email phone');
 
-    // Trigger Web Push Notification to Customer if transitioning from 'Order Placed' (Pending) to 'Confirmed' or 'Preparing'
-    if (previousStatus === 'Order Placed' && (status === 'Confirmed' || status === 'Preparing')) {
-      sendCustomerOrderNotification(order, 'ORDER_ACCEPTED').catch(err => {
-        console.error('Failed to send order acceptance customer push:', err.message);
-      });
-    } else if (['Out for Delivery', 'Delivered', 'Cancelled'].includes(status) && previousStatus !== status) {
+    // Trigger Web Push Notification to Customer on status changes
+    if (previousStatus !== status) {
       sendCustomerOrderNotification(order, status).catch(err => {
-        console.error('Failed to send status push notification:', err.message);
+        console.error(`Failed to send status (${status}) push notification:`, err.message);
       });
     }
 
@@ -179,23 +175,13 @@ const updateOrderStatus = async (req, res, status) => {
     if (io) {
       const userRoom = order.user._id ? order.user._id.toString() : order.user.toString();
 
-      // Emit to admin room
+      // Broadcast unified updated order object to admin and user rooms
       io.to('admin').emit('orderUpdated', order);
-
-      // Emit to user room
       io.to(userRoom).emit('orderUpdated', order);
       io.to(userRoom).emit('order-status-update', {
         orderId: order._id,
         status: status
       });
-
-      // Emit specific status events
-      if (status === 'Confirmed') io.to(userRoom).emit('orderAccepted', order);
-      if (status === 'Printing') io.to(userRoom).emit('orderPrinting', order);
-      if (status === 'Preparing') io.to(userRoom).emit('orderPacked', order);
-      if (status === 'Out for Delivery') io.to(userRoom).emit('orderOutForDelivery', order);
-      if (status === 'Delivered') io.to(userRoom).emit('orderDelivered', order);
-      if (status === 'Cancelled') io.to(userRoom).emit('orderCancelled', order);
     }
 
     return res.json({ success: true, message: `Order marked as ${status}`, order });

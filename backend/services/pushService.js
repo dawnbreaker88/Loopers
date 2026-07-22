@@ -38,7 +38,7 @@ export const sendNewOrderNotification = async (order) => {
     const orderTotal = `₹${order.totalPrice.toFixed(0)}`;
 
     // Format address: line 1 only (e.g. house/room number + street)
-    let firstLineAddress = 'Campus Delivery';
+    let firstLineAddress = 'Delivery';
     if (order.address) {
       const house = order.address.houseNumber || '';
       const street = order.address.street || '';
@@ -101,23 +101,31 @@ export const sendCustomerOrderNotification = async (order, eventType = 'ORDER_AC
     }
 
     let title = 'Loopers';
-    let body = 'Your order has been accepted and is now being packed.';
+    let body = 'Your order status has been updated.';
     let url = `/tracking/${order._id}`;
 
-    if (eventType === 'ORDER_ACCEPTED' || eventType === 'Confirmed' || eventType === 'Packing') {
-      title = 'Loopers';
-      body = 'Your order has been accepted and is now being packed.';
+    if (eventType === 'ORDER_ACCEPTED' || eventType === 'Confirmed') {
+      title = '🛒 Order Accepted';
+      body = 'Your order has been accepted and is now being packed!';
+      url = `/tracking/${order._id}`;
+    } else if (eventType === 'Printing') {
+      title = '🖨️ Printing Started';
+      body = 'Your documents are being printed now.';
+      url = `/tracking/${order._id}`;
+    } else if (eventType === 'Preparing' || eventType === 'Packing') {
+      title = '📦 Order Packed';
+      body = 'Your order is packed and ready for delivery!';
       url = `/tracking/${order._id}`;
     } else if (eventType === 'Out for Delivery') {
-      title = 'Loopers';
-      body = 'Your order is out for delivery!';
+      title = '🛵 Out for Delivery';
+      body = 'Your rider is on the way! Out for delivery.';
       url = `/tracking/${order._id}`;
     } else if (eventType === 'Delivered') {
-      title = 'Loopers';
-      body = 'Your order has been delivered.';
+      title = '🎉 Order Delivered';
+      body = 'Your order has been delivered. Enjoy your essentials!';
       url = `/tracking/${order._id}`;
     } else if (eventType === 'Cancelled') {
-      title = 'Loopers';
+      title = '❌ Order Cancelled';
       body = 'Your order has been cancelled.';
       url = `/orders`;
     }
@@ -128,8 +136,8 @@ export const sendCustomerOrderNotification = async (order, eventType = 'ORDER_AC
       orderId: order._id,
       type: eventType,
       url,
-      icon: '/loopers.svg',
-      badge: '/loopers.svg',
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
       timestamp: Date.now()
     });
 

@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import User from './models/User.js';
 import Order from './models/Order.js';
@@ -41,10 +42,31 @@ connectDB().then(() => {
 const app = express();
 const server = http.createServer(app);
 
-// Security Middleware: Helmet & Rate Limiter
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+// Security Middleware: Helmet & Rate Limiters
 app.use(helmet({
   contentSecurityPolicy: false // Allows inline scripts in dev/demo if needed
 }));
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: { success: false, message: 'Too many requests from this IP. Please try again later.' }
+});
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -52,11 +74,18 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication attempts. Please try again later.' }
 });
 
+const uploadLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 15, // Limit each IP/user to 15 file uploads per windowMs
+  message: { success: false, message: 'Too many uploads from this IP. Please try again later.' }
+});
+
 // Configure Socket.io
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
   }
 });
 
@@ -64,12 +93,15 @@ const io = new Server(server, {
 app.set('socketio', io);
 
 // Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ limit: '30mb', extended: true }));
 
-// Apply Rate Limiter to Auth routes
+// Apply rate limiters
+app.use('/api', globalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/upload', uploadLimiter);
 
 // Health check route
 app.get('/', (req, res) => {
@@ -132,8 +164,13 @@ io.on('connection', (socket) => {
   // Join User Room (Explicit fallback)
   socket.on('join-user-room', (userId) => {
     if (userId) {
-      socket.join(userId);
-      console.log(`User socket ${socket.id} joined room: ${userId}`);
+      if (socket.user && (socket.user._id.toString() === userId.toString() || socket.user.role === 'admin')) {
+        socket.join(userId);
+        console.log(`User socket ${socket.id} joined room: ${userId}`);
+      } else {
+        console.warn(`[Security Alert] Unauthorized join-user-room attempt for room ${userId} by socket ${socket.id}`);
+        socket.emit('error', { message: 'Forbidden: Unauthorized access to this user room' });
+      }
     }
   });
 
@@ -197,3 +234,33 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
+
+// Graceful Shutdown Handler
+const gracefulShutdown = (signal) => {
+  console.log(`\n[Shutdown] Received ${signal}. Initializing graceful shutdown sequence...`);
+  
+  // Close HTTP server first (stops accepting new connections)
+  server.close(async () => {
+    console.log('[Shutdown] Active HTTP connections closed.');
+    try {
+      // Disconnect from database
+      await mongoose.connection.close(false);
+      console.log('[Shutdown] MongoDB connection closed successfully.');
+      process.exit(0);
+    } catch (err) {
+      console.error('[Shutdown Error] Error closing MongoDB connection:', err.message);
+      process.exit(1);
+    }
+  });
+
+  // Enforce a hard timeout limit of 10s
+  setTimeout(() => {
+    console.error('[Shutdown Failure] Forced shutdown triggered due to shutdown timeout.');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Trigger nodemon reload

@@ -8,7 +8,7 @@ export const getStoreStatus = async (req, res) => {
     let store = await Store.findOne();
     if (!store) {
       store = await Store.create({
-        storeName: 'Loopers Campus Dark Store',
+        storeName: 'Loopers',
         openingTime: '07:00 AM',
         closingTime: '02:00 AM',
         isOpen: true

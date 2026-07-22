@@ -167,7 +167,6 @@ export const createOrder = async (req, res) => {
     // Emit socket event to admin room
     const io = req.app.get('socketio');
     if (io) {
-      io.to('admin').emit('new-order', order);
       const hasPrintout = order.products.some(p => p.type === 'printout');
       const orderType = hasPrintout ? 'Printout' : 'Normal Product';
       let pages = 0;
@@ -188,7 +187,7 @@ export const createOrder = async (req, res) => {
         createdAt: order.createdAt
       };
       io.to('admin').emit('newOrder', newOrderPayload);
-      console.log(`[ORDER] Socket Event 'new-order' and 'newOrder' Emitted to room 'admin' for order: ${order._id}`);
+      console.log(`[ORDER] Socket event 'newOrder' emitted to room 'admin' for order: ${order._id}`);
     }
 
     // Trigger Web Push Notification MVP for Admins in background
@@ -343,5 +342,49 @@ export const rateOrder = async (req, res) => {
   } catch (error) {
     console.error('Rate Order Error:', error.message);
     return res.status(500).json({ success: false, message: 'Server error rating order' });
+  }
+};
+
+// @desc    Download printout PDF securely
+// @route   GET /api/orders/:id/printout/:index/download
+// @access  Private
+export const downloadOrderPrintout = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Check authorization: only the order placing customer or admin can download the print file
+    const orderUserId = order.user?._id ? order.user._id.toString() : order.user?.toString();
+    const isCustomer = orderUserId === req.user._id.toString();
+    const isAdminUser = req.user.role === 'admin';
+
+    if (!isCustomer && !isAdminUser) {
+      return res.status(403).json({ success: false, message: 'Not authorized to download this file' });
+    }
+
+    const index = parseInt(req.params.index, 10);
+    const printoutProduct = order.products[index];
+
+    if (!printoutProduct || printoutProduct.type !== 'printout' || !printoutProduct.pdfUrl) {
+      return res.status(404).json({ success: false, message: 'Printout file not found' });
+    }
+
+    // Retrieve file from Cloudinary securely and pipe it back to user
+    const response = await fetch(printoutProduct.pdfUrl);
+    if (!response.ok) {
+      return res.status(500).json({ success: false, message: 'Failed to retrieve file from storage server' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${printoutProduct.pdfName || 'printout.pdf'}"`);
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Download Printout Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error downloading print file' });
   }
 };

@@ -37,14 +37,43 @@ const seedAdmin = async () => {
   }
 };
 
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/hyperlocal-dispatcher');
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-    await seedAdmin();
-  } catch (error) {
-    console.error(`MongoDB connection error: ${error.message}`);
-    process.exit(1);
+const connectDB = async (retries = 5, delay = 5000) => {
+  // Setup connection event listeners once
+  if (!mongoose.connection._hasListeners) {
+    mongoose.connection.on('error', (err) => {
+      console.error(`[MDB Connection Error]: ${err.message}`);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('[MDB Warn]: MongoDB disconnected. Attempting automatic reconnection...');
+    });
+
+    mongoose.connection.on('connected', () => {
+      console.log('[MDB Info]: MongoDB connection established.');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      console.log('[MDB Info]: MongoDB reconnected successfully.');
+    });
+
+    mongoose.connection._hasListeners = true;
+  }
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const conn = await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/hyperlocal-dispatcher');
+      console.log(`[MDB Info] Connected: ${conn.connection.host}`);
+      await seedAdmin();
+      return;
+    } catch (error) {
+      console.error(`[MDB Connection Error] Attempt ${attempt}/${retries} failed: ${error.message}`);
+      if (attempt === retries) {
+        console.error('[MDB Failure] Critical: Reached maximum connection attempts. Node application exiting.');
+        process.exit(1);
+      }
+      console.log(`Retrying in ${delay / 1000}s...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 };
 
