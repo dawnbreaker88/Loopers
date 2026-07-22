@@ -158,3 +158,4 @@ workbox-*.js.map
 # Misc
 # ==========================================
 .vercel
+**/node_modules/
