@@ -9,9 +9,17 @@ export default function FloatingCartBar() {
   const { items, totalPrice } = useSelector((state) => state.cart);
   const { user } = useSelector((state) => state.auth);
 
-  // Hide on Cart, Checkout, Admin, and Login/Signup pages
-  const hiddenRoutes = ['/cart', '/checkout', '/payment', '/login', '/signup'];
-  if (hiddenRoutes.includes(location.pathname) || location.pathname.startsWith('/admin')) {
+  // Hide on Cart, Checkout, Admin, tracking, and Login/Signup pages
+  const hiddenRoutes = [
+    '/cart', '/checkout', '/payment', '/login', '/signup',
+    '/app/cart', '/app/checkout', '/app/payment', '/app/orders'
+  ];
+  if (
+    hiddenRoutes.includes(location.pathname) || 
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/app/admin') ||
+    location.pathname.startsWith('/app/tracking')
+  ) {
     return null;
   }
 
