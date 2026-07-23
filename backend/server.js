@@ -108,17 +108,17 @@ app.use(cors(corsOptions));
 
 app.options("*", cors(corsOptions));
 
-const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000', 10), // Default: 15 mins
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100', 10),
-  message: { success: false, message: 'Too many authentication attempts. Please try again later.' }
-});
+// const authLimiter = rateLimit({
+//   windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000', 10), // Default: 15 mins
+//   max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100', 10),
+//   message: { success: false, message: 'Too many authentication attempts. Please try again later.' }
+// });
 
-const apiLimiter = rateLimit({
-  windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS || '900000', 10),
-  max: parseInt(process.env.API_RATE_LIMIT_MAX || '500', 10),
-  message: { success: false, message: 'Too many API requests. Please try again later.' }
-});
+// const apiLimiter = rateLimit({
+//   windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS || '900000', 10),
+//   max: parseInt(process.env.API_RATE_LIMIT_MAX || '500', 10),
+//   message: { success: false, message: 'Too many API requests. Please try again later.' }
+// });
 
 // Configure Socket.io
 const io = new Server(server, {
@@ -152,10 +152,10 @@ app.set('socketio', io);
 // Request body parser limit
 app.use(express.json({ limit: process.env.MAX_REQUEST_BODY_SIZE || '10mb' }));
 
-// Apply Rate Limiters
-app.use('/api/', apiLimiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+// // Apply Rate Limiters
+// app.use('/api/', apiLimiter);
+// app.use('/api/auth/login', authLimiter);
+// app.use('/api/auth/register', authLimiter);
 
 // Health check route
 app.get('/', (req, res) => {
