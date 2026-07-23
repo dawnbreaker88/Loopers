@@ -45,6 +45,7 @@ router.get('/analytics/customers', getCustomerAnalytics);
 router.get('/analytics/geographic', getGeographicAnalytics);
 
 // Order Lifecycle routes
+router.get('/orders/:id/printout/download', validate(idParamSchema), downloadOrderPrintout);
 router.post('/orders/:id/accept', validate(idParamSchema), acceptOrder);
 router.post('/orders/:id/print', validate(idParamSchema), printOrder);
 router.post('/orders/:id/pack', validate(idParamSchema), packOrder);
