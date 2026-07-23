@@ -4,6 +4,7 @@ import Product from '../models/Product.js';
 import AdminSubscription from '../models/AdminSubscription.js';
 import { vapidKeys, sendCustomerOrderNotification } from '../services/pushService.js';
 import { validateStatusTransition } from '../utils/orderStateMachine.js';
+import { pipeline } from 'stream';
 
 // @desc    Get all users
 
@@ -211,6 +212,53 @@ export const packOrder = (req, res) => updateOrderStatus(req, res, 'Preparing');
 export const outForDeliveryOrder = (req, res) => updateOrderStatus(req, res, 'Out for Delivery');
 export const deliverOrder = (req, res) => updateOrderStatus(req, res, 'Delivered');
 export const cancelOrderAdmin = (req, res) => updateOrderStatus(req, res, 'Cancelled');
+
+export const downloadOrderPrintout = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const printItem = order.products?.find((item) => item.type === 'printout');
+    if (!printItem || !printItem.pdfUrl) {
+      return res.status(400).json({ success: false, message: 'No printout file available for download' });
+    }
+
+    const fileUrl = printItem.pdfUrl;
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, message: 'Unable to retrieve printout file' });
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = response.headers.get('content-length');
+    const filename = printItem.pdfName ? printItem.pdfName.replace(/"/g, '') : 'printout.pdf';
+
+    res.setHeader('Content-Type', contentType);
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const readable = response.body;
+    if (!readable) {
+      return res.status(500).json({ success: false, message: 'Unable to stream printout file' });
+    }
+
+    pipeline(readable, res, (err) => {
+      if (err) {
+        console.error('Download Order Printout Error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, message: 'Failed to download printout file' });
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Download Order Printout Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error downloading printout file' });
+  }
+};
 
 // @desc    Get VAPID Public Key for web push subscription
 // @route   GET /api/admin/vapid-public-key
