@@ -312,6 +312,25 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const handleDownloadPrintout = async (orderId, fileName = 'printout.pdf') => {
+    try {
+      const response = await api.get(`/api/admin/orders/${orderId}/printout/download`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to download printout file');
+    }
+  };
+
   // Product Create/Edit Handlers
   const handleSaveProduct = async (e) => {
     e.preventDefault();
@@ -977,15 +996,13 @@ export default function AdminOrdersPage() {
                                   <p className="text-[10px] text-sys-text-secondary">
                                     Specs: {item.paperSize} • {item.printMode === 'double' ? 'Double' : 'Single'} • {item.colorPages > 0 ? 'Color' : 'B&W'} • {item.pages} pgs • {item.copies} cps{item.binding && item.binding !== 'none' ? ` • ${item.binding} binding` : ''}{item.extras?.includes('lamination') ? ' • Laminated' : ''}
                                   </p>
-                                  <a
-                                    href={item.pdfUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    download
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadPrintout(order._id, item.pdfName || 'printout.pdf')}
                                     className="inline-flex items-center text-[10px] font-extrabold text-[#40A2E3] hover:underline"
                                   >
                                     Download Document
-                                  </a>
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -1198,15 +1215,13 @@ export default function AdminOrdersPage() {
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex flex-wrap gap-1.5 justify-end">
                               {/* Download File */}
-                              <a
-                                href={printItem.pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPrintout(order._id, printItem.pdfName || 'printout.pdf')}
                                 className="inline-flex items-center space-x-1 text-[10px] font-extrabold text-[#40A2E3] bg-[#40A2E3]/10 hover:bg-[#40A2E3]/20 px-2.5 py-1 rounded-lg border border-[#40A2E3]/20 transition-all active:scale-95"
                               >
                                 <span>Download</span>
-                              </a>
+                              </button>
 
                               {/* State Transition Actions */}
                               {order.orderStatus === 'Order Placed' && (
