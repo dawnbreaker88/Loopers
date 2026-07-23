@@ -74,7 +74,7 @@ const allowedOrigins = process.env.CORS_ORIGIN
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const isAllowed = process.env.NODE_ENV !== 'production' ||
+    const isAllowed = process.env.NODE_ENV == 'production' ||
                       allowedOrigins.includes('*') || 
                       allowedOrigins.includes(origin);
     if (isAllowed) {
@@ -105,7 +105,7 @@ const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      const isAllowed = process.env.NODE_ENV !== 'production' ||
+      const isAllowed = process.env.NODE_ENV == 'production' ||
                         allowedOrigins.includes('*') || 
                         allowedOrigins.includes(origin);
       if (isAllowed) {
