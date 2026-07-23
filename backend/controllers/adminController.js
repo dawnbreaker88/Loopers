@@ -256,3 +256,21 @@ export const subscribeAdmin = async (req, res) => {
   }
 };
 
+// @desc    Unsubscribe admin user from push notifications
+// @route   POST /api/admin/unsubscribe
+// @access  Private/Admin
+export const unsubscribeAdmin = async (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    return res.status(400).json({ success: false, message: 'Endpoint is required' });
+  }
+
+  try {
+    await AdminSubscription.deleteOne({ endpoint, admin: req.user._id });
+    return res.status(200).json({ success: true, message: 'Admin subscription removed successfully' });
+  } catch (error) {
+    console.error('Unsubscribe Admin Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error removing subscription' });
+  }
+};
+

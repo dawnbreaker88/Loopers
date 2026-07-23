@@ -620,4 +620,22 @@ export const subscribePush = async (req, res) => {
   }
 };
 
+// @desc    Unsubscribe user from web push notifications
+// @route   POST /api/auth/unsubscribe
+// @access  Private
+export const unsubscribePush = async (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    return res.status(400).json({ success: false, message: 'Endpoint is required' });
+  }
+
+  try {
+    await UserSubscription.deleteOne({ endpoint, user: req.user._id });
+    return res.status(200).json({ success: true, message: 'Push subscription removed successfully' });
+  } catch (error) {
+    console.error('Unsubscribe Push Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to remove push subscription' });
+  }
+};
+
 

@@ -10,10 +10,13 @@ export const useGeoLocation = () => {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
+    let watchId = null;
+    let isStopped = false;
+
     const updateLocationOnServer = async (latitude, longitude) => {
       try {
         const res = await api.put('/api/auth/location', { latitude, longitude });
-        if (res.data.success) {
+        if (res.data.success && !isStopped) {
           dispatch(updateUserLocationAction(res.data.location));
         }
       } catch (err) {
@@ -21,10 +24,13 @@ export const useGeoLocation = () => {
       }
     };
 
-    if (navigator.geolocation) {
+    const startTracking = () => {
+      if (!navigator.geolocation) return;
+
       // 1. Get initial position
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          if (isStopped) return;
           const { latitude, longitude } = position.coords;
           updateLocationOnServer(latitude, longitude);
         },
@@ -35,8 +41,9 @@ export const useGeoLocation = () => {
       );
 
       // 2. Watch position for periodic movement tracking
-      const watchId = navigator.geolocation.watchPosition(
+      watchId = navigator.geolocation.watchPosition(
         (position) => {
+          if (isStopped) return;
           const { latitude, longitude } = position.coords;
           updateLocationOnServer(latitude, longitude);
         },
@@ -45,13 +52,39 @@ export const useGeoLocation = () => {
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       );
+    };
 
-      return () => {
+    const checkAndStartTracking = async () => {
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const result = await navigator.permissions.query({ name: 'geolocation' });
+          if (result.state === 'granted') {
+            startTracking();
+          } else {
+            if (import.meta.env.DEV) console.log('[useGeoLocation] Geolocation state is ' + result.state + ', skipping automatic prompt.');
+          }
+        } catch (err) {
+          console.warn('Permissions query error:', err.message);
+        }
+      } else {
+        // Fallback for Safari/iOS:
+        // Only auto-request on start if the user already has location coordinates saved (assumes previous grant)
+        const coords = user?.location;
+        const hasCoords = coords && coords.latitude && coords.longitude;
+        if (hasCoords) {
+          startTracking();
+        }
+      }
+    };
+
+    checkAndStartTracking();
+
+    return () => {
+      isStopped = true;
+      if (watchId !== null && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchId);
-      };
-    } else {
-      console.warn('Geolocation is not supported by this browser.');
-    }
+      }
+    };
   }, [isAuthenticated, user?._id, dispatch]);
 };
 

@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext.jsx';
 import Logo from './Logo.jsx';
 import { ShoppingCart, User, LogOut, Sun, Moon, ShoppingBag } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import api from '../services/api.js';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -47,7 +48,23 @@ export default function Navbar() {
     };
   }, [dropdownOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            const isAdminUser = user?.role === 'admin';
+            const endpoint = isAdminUser ? '/api/admin/unsubscribe' : '/api/auth/unsubscribe';
+            await api.post(endpoint, { endpoint: subscription.endpoint }).catch(() => {});
+            await subscription.unsubscribe().catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to unsubscribe push on logout:', e);
+    }
     dispatch(logout());
     setDropdownOpen(false);
     toast.success('Logged out successfully');

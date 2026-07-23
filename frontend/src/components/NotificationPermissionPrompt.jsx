@@ -21,6 +21,19 @@ export default function NotificationPermissionPrompt() {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const [showPrompt, setShowPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [permission, setPermission] = useState(() => 
+    'Notification' in window ? Notification.permission : 'unsupported'
+  );
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if ('Notification' in window) {
+        setPermission(Notification.permission);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const isAdmin = user?.role === 'admin';
   const isCheckoutRoute = ['/checkout', '/payment'].includes(location.pathname);
@@ -36,16 +49,15 @@ export default function NotificationPermissionPrompt() {
     }
 
     // 2. Check if Notification API & ServiceWorker are supported
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    if (permission === 'unsupported' || !('serviceWorker' in navigator)) {
       if (import.meta.env.DEV) console.log('[Notification Prompt] Push notifications not supported in this browser.');
       return;
     }
 
-    // 3. Skip if permission is already granted or blocked
-    if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-      if (Notification.permission === 'granted') {
-        checkAndSyncSubscription();
-      }
+    // 3. Skip if permission is already granted
+    if (permission === 'granted') {
+      checkAndSyncSubscription();
+      setShowPrompt(false);
       return;
     }
 
@@ -78,7 +90,7 @@ export default function NotificationPermissionPrompt() {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user?.role, location.pathname]);
+  }, [isAuthenticated, user?.role, location.pathname, permission]);
 
   const ensureServiceWorker = async () => {
     if (!('serviceWorker' in navigator)) return null;
@@ -179,42 +191,65 @@ export default function NotificationPermissionPrompt() {
 
   if (!showPrompt) return null;
 
+  const isDenied = permission === 'denied';
+
+  const handleOpenSettingsGuide = () => {
+    toast.error(
+      'To enable notifications: Click the lock icon in your browser URL bar and change Notifications permission to Allow.',
+      { id: 'notif-settings-toast', duration: 5000 }
+    );
+  };
+
   return (
     <div className="bg-primary-500/10 border border-primary-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in mb-6">
       <div className="flex items-start space-x-3.5">
         <div className="w-10 h-10 rounded-xl bg-primary-500/15 text-primary-500 flex items-center justify-center shrink-0 border border-primary-500/20 shadow-inner">
-          <Bell className="animate-bounce stroke-[2]" size={20} />
+          <Bell className={`${isDenied ? '' : 'animate-bounce'} stroke-[2]`} size={20} />
         </div>
         <div>
           <div className="flex items-center space-x-1.5">
-            <h4 className="text-xs font-black text-sys-text-primary">Enable Order Alerts</h4>
+            <h4 className="text-xs font-black text-sys-text-primary">
+              {isDenied ? 'Notifications: Permission Denied' : 'Enable Order Alerts'}
+            </h4>
             <span className="bg-primary-500/20 text-primary-500 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border border-primary-500/30 flex items-center gap-0.5 uppercase tracking-wider">
-              <Sparkles size={8} /> Instant Updates
+              <Sparkles size={8} /> {isDenied ? 'Blocked' : 'Instant Updates'}
             </span>
           </div>
           <p className="text-[11px] text-sys-text-secondary mt-1 leading-snug">
-            {isAdmin 
-              ? 'Receive background notifications whenever a customer places an order.' 
-              : 'Get instant background updates when your order is accepted and out for delivery.'}
+            {isDenied
+              ? 'Notifications are blocked. Please enable them in browser settings to receive order updates.'
+              : isAdmin 
+                ? 'Receive background notifications whenever a customer places an order.' 
+                : 'Get instant background updates when your order is accepted and out for delivery.'}
           </p>
         </div>
       </div>
 
       <div className="flex items-center space-x-2 w-full sm:w-auto self-end sm:self-center shrink-0">
-        <button
-          onClick={handleRequestPermission}
-          disabled={loading}
-          className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm shadow-primary-500/20 active:scale-[0.98]"
-        >
-          {loading ? (
-            <span>Enabling...</span>
-          ) : (
-            <>
-              <Bell size={13} />
-              <span>Enable Notifications</span>
-            </>
-          )}
-        </button>
+        {isDenied ? (
+          <button
+            onClick={handleOpenSettingsGuide}
+            className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-[0.98]"
+          >
+            <Bell size={13} />
+            <span>Open Browser Settings</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleRequestPermission}
+            disabled={loading}
+            className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm shadow-primary-500/20 active:scale-[0.98]"
+          >
+            {loading ? (
+              <span>Enabling...</span>
+            ) : (
+              <>
+                <Bell size={13} />
+                <span>Enable Notifications</span>
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={handleDismiss}
           className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sys-text-secondary font-bold text-[11px] transition-colors"

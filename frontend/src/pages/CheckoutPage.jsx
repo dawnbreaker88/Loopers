@@ -19,7 +19,7 @@ export default function CheckoutPage() {
   const orders = useSelector((state) => state.orders.orders);
 
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('UPI'); // 'UPI' or 'COD' only
+  const [paymentMethod, setPaymentMethod] = useState('COD'); // 'COD' only
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -253,77 +253,25 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Payment Method Selection (Only UPI & COD) */}
+      {/* Payment Method Selection (Only COD enabled) */}
       <div className="bg-sys-surface border border-sys-border rounded-2xl p-4 space-y-3 shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-extrabold text-[#0F172A] dark:text-white">
           <CreditCard size={16} className="text-[#40A2E3]" />
           <span>Payment Method</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setPaymentMethod('UPI')}
-            className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center space-x-2 ${paymentMethod === 'UPI'
-                ? 'border-[#40A2E3] bg-[#40A2E3] text-white shadow-xs'
-                : 'border-[#E2E8F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#64748B] dark:text-slate-300'
-              }`}
-          >
-            <QrCode size={16} />
-            <span>UPI / QR Code</span>
-          </button>
-
-          <button
-            onClick={() => setPaymentMethod('COD')}
-            className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center space-x-2 ${paymentMethod === 'COD'
-                ? 'border-[#40A2E3] bg-[#40A2E3] text-white shadow-xs'
-                : 'border-[#E2E8F0] dark:border-slate-700 bg-white dark:bg-slate-800 text-[#64748B] dark:text-slate-300'
-              }`}
-          >
-            <span>Cash on Delivery</span>
-          </button>
-        </div>
-
-        {/* UPI QR Display Placeholder */}
-        {paymentMethod === 'UPI' && (
-          <div className="mt-3 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center space-y-2 animate-fade-in">
-            {upiId ? (
-              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=${encodeURIComponent(upiId)}&pn=LoopersQuickCommerce&am=${finalTotal}&cu=INR`}
-                  alt="Loopers UPI QR"
-                  className="w-28 h-28 object-contain"
-                />
-              </div>
-            ) : (
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs font-semibold rounded-xl max-w-[200px]">
-                UPI QR unavailable (No merchant UPI ID configured)
-              </div>
-            )}
-            <p className="text-[11px] font-bold text-[#0F172A] dark:text-white">
-              Scan & Pay <span className="text-[#40A2E3] font-mono">₹{finalTotal.toFixed(2)}</span>
-            </p>
-            <div className="flex items-center space-x-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-[#64748B] dark:text-slate-300">
-              <span>{upiId || 'No UPI ID configured'}</span>
-              {upiId && (
-                <button onClick={handleCopyUpi} className="text-[#40A2E3] hover:text-[#40A2E3]/80">
-                  <Copy size={13} />
-                </button>
-              )}
+        <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-500/10 flex items-center justify-between text-xs font-semibold">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <div>
+              <span className="text-[#0F172A] dark:text-white font-bold block">Cash on Delivery (COD)</span>
+              <span className="text-[10px] text-[#64748B] dark:text-slate-400">Pay cash or scan QR code at delivery agent's doorstep.</span>
             </div>
-            {upiId && (
-              <a
-                href={`upi://pay?pa=${encodeURIComponent(upiId)}&pn=LoopersQuickCommerce&am=${finalTotal}&cu=INR`}
-                className="w-full py-2 px-3 bg-[#40A2E3] hover:bg-[#38bdf8] text-white font-extrabold text-[11px] rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-xs active:scale-95"
-              >
-                <span>Pay Now (Open UPI App)</span>
-              </a>
-            )}
-            <p className="text-[10px] text-[#64748B] dark:text-slate-400">
-              GPay • PhonePe • Paytm • BHIM
-            </p>
           </div>
-        )}
-
+          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+            Active
+          </span>
+        </div>
       </div>
 
       {/* Delivery Notes */}

@@ -68,25 +68,45 @@ app.use(helmet({
 }));
 
 // Configurable CORS Origin
-const allowedOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, '')) 
-  : ['*'];
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const isAllowed = process.env.NODE_ENV == 'production' ||
-                      allowedOrigins.includes('*') || 
-                      allowedOrigins.includes(origin);
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map(o => o.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    console.log("Incoming Origin:", origin);
+    console.log("Allowed Origins:", allowedOrigins);
+
+    if (!origin) {
+      return callback(null, true);
     }
+
+    const normalizedOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      console.log("✅ Allowed:", normalizedOrigin);
+      return callback(null, true);
+    }
+
+    console.error("❌ Blocked:", normalizedOrigin);
+
+    callback(new Error("Not allowed by CORS"));
   },
+
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization"
+  ]
+};
+
+app.use(cors(corsOptions));
+
+app.options("*", cors(corsOptions));
 
 const authLimiter = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000', 10), // Default: 15 mins
@@ -103,19 +123,26 @@ const apiLimiter = rateLimit({
 // Configure Socket.io
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      const isAllowed = process.env.NODE_ENV == 'production' ||
-                        allowedOrigins.includes('*') || 
-                        allowedOrigins.includes(origin);
-      if (isAllowed) {
-        callback(null, origin);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+    origin(origin, callback) {
+
+      if (!origin) {
+        return callback(null, true);
       }
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      console.error("❌ Socket CORS Blocked:", normalizedOrigin);
+
+      callback(new Error("Not allowed by CORS"));
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
+
+    credentials: true,
+
+    methods: ["GET", "POST"]
   }
 });
 
@@ -219,7 +246,7 @@ io.on('connection', (socket) => {
           const userIdStr = socket.user._id.toString();
           const orderUserStr = order.user.toString();
           const isAdmin = socket.user.role === 'admin';
-          
+
           if (isAdmin || userIdStr === orderUserStr) {
             socket.join(orderId);
           } else {

@@ -10,6 +10,7 @@ export default function LocationPromptBanner() {
   const { isAuthenticated, user } = useSelector((state) => state.auth || {});
   const [showPrompt, setShowPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [permissionState, setPermissionState] = useState('prompt');
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -63,7 +64,19 @@ export default function LocationPromptBanner() {
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (!isMounted.current) return;
-        if (result.state === 'granted' || result.state === 'denied') {
+        setPermissionState(result.state);
+        
+        result.onchange = () => {
+          if (!isMounted.current) return;
+          setPermissionState(result.state);
+          if (result.state === 'granted') {
+            setShowPrompt(false);
+          } else {
+            setShowPrompt(true);
+          }
+        };
+
+        if (result.state === 'granted') {
           setShowPrompt(false);
         } else {
           setShowPrompt(true);
@@ -134,6 +147,15 @@ export default function LocationPromptBanner() {
 
   if (!showPrompt) return null;
 
+  const isDenied = permissionState === 'denied';
+
+  const handleOpenSettingsGuide = () => {
+    toast.error(
+      'To enable location: Click the lock icon in your browser URL bar and change Location permission to Allow.',
+      { id: 'loc-settings-toast', duration: 5000 }
+    );
+  };
+
   return (
     <div className="bg-[#40A2E3]/10 border border-[#40A2E3]/20 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in my-3 shadow-xs">
       <div className="flex items-start space-x-3.5">
@@ -142,32 +164,46 @@ export default function LocationPromptBanner() {
         </div>
         <div>
           <div className="flex items-center space-x-1.5">
-            <h4 className="text-xs font-black text-sys-text-primary">Enable Location for 10-Min Delivery</h4>
+            <h4 className="text-xs font-black text-sys-text-primary">
+              {isDenied ? 'Location Disabled' : 'Enable Location for 10-Min Delivery'}
+            </h4>
             <span className="bg-[#40A2E3]/20 text-[#40A2E3] text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border border-[#40A2E3]/30 flex items-center gap-0.5 uppercase tracking-wider">
-              <Sparkles size={8} /> Fast Delivery
+              <Sparkles size={8} /> {isDenied ? 'Blocked' : 'Fast Delivery'}
             </span>
           </div>
           <p className="text-[11px] text-sys-text-secondary mt-1 leading-snug">
-            Allow location access so our delivery agent can deliver orders right to your exact room.
+            {isDenied
+              ? 'Location permission is denied. Please open browser settings and allow location access to continue.'
+              : 'Allow location access so our delivery agent can deliver orders right to your exact room.'}
           </p>
         </div>
       </div>
 
       <div className="flex items-center space-x-2 w-full sm:w-auto self-end sm:self-center shrink-0">
-        <button
-          onClick={handleEnableLocation}
-          disabled={loading}
-          className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-[#40A2E3] hover:bg-[#2E94D9] text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm shadow-[#40A2E3]/20 active:scale-[0.98] disabled:opacity-70"
-        >
-          {loading ? (
-            <span>Acquiring...</span>
-          ) : (
-            <>
-              <Navigation size={13} />
-              <span>Enable Location</span>
-            </>
-          )}
-        </button>
+        {isDenied ? (
+          <button
+            onClick={handleOpenSettingsGuide}
+            className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm active:scale-[0.98]"
+          >
+            <Navigation size={13} />
+            <span>Open Browser Settings</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleEnableLocation}
+            disabled={loading}
+            className="flex-1 sm:flex-none py-2 px-3.5 rounded-xl bg-[#40A2E3] hover:bg-[#2E94D9] text-white font-extrabold text-[11px] transition-all flex items-center justify-center space-x-1.5 shadow-sm shadow-[#40A2E3]/20 active:scale-[0.98] disabled:opacity-70"
+          >
+            {loading ? (
+              <span>Acquiring...</span>
+            ) : (
+              <>
+                <Navigation size={13} />
+                <span>Enable Location</span>
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={handleDismiss}
           className="py-2 px-3 rounded-xl bg-sys-surface-secondary hover:bg-sys-surface-hover text-sys-text-secondary font-bold text-[11px] transition-colors border border-sys-border"

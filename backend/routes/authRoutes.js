@@ -13,7 +13,8 @@ import {
   changePassword,
   refreshToken,
   getVapidPublicKey,
-  subscribePush
+  subscribePush,
+  unsubscribePush
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 import { 
@@ -41,5 +42,6 @@ router.delete('/address/:addressId', protect, validate(addressIdParamSchema), de
 router.put('/location', protect, updateUserLocation);
 router.get('/vapid-public-key', protect, getVapidPublicKey);
 router.post('/subscribe', protect, subscribePush);
+router.post('/unsubscribe', protect, unsubscribePush);
 
 export default router;

@@ -9,7 +9,8 @@ import {
   deliverOrder,
   cancelOrderAdmin,
   getVapidPublicKey,
-  subscribeAdmin
+  subscribeAdmin,
+  unsubscribeAdmin
 } from '../controllers/adminController.js';
 import {
   getAdminAnalyticsSummary,
@@ -33,6 +34,7 @@ router.put('/users/:id/status', validate(idParamSchema), updateUserStatus);
 // Web Push MVP routes
 router.get('/vapid-public-key', getVapidPublicKey);
 router.post('/subscribe', subscribeAdmin);
+router.post('/unsubscribe', unsubscribeAdmin);
 
 // Analytics endpoints
 router.get('/analytics', getAdminAnalyticsSummary);

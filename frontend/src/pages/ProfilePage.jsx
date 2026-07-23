@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout, loginSuccess } from '../store/authSlice.js';
@@ -21,7 +21,8 @@ import {
   Settings,
   Key,
   Save,
-  Edit2
+  Edit2,
+  Bell
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -30,6 +31,212 @@ export default function ProfilePage() {
   const dispatch = useDispatch();
   const { isDarkMode, toggleTheme } = useTheme();
   const { user, token } = useSelector((state) => state.auth);
+
+  // Permission & PWA States
+  const [notifState, setNotifState] = useState('default'); // 'default', 'granted', 'denied', 'unsupported'
+  const [hasPushSub, setHasPushSub] = useState(false);
+  const [locState, setLocState] = useState('prompt'); // 'prompt', 'granted', 'denied', 'unsupported', 'fetching'
+  const [locLoading, setLocLoading] = useState(false);
+
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const syncBrowserStates = async () => {
+    // 1. Notification Permission & Subscription State
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setNotifState('unsupported');
+    } else {
+      setNotifState(Notification.permission);
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          const sub = await registration.pushManager.getSubscription();
+          setHasPushSub(!!sub);
+        } else {
+          setHasPushSub(false);
+        }
+      } catch (e) {
+        setHasPushSub(false);
+      }
+    }
+
+    // 2. Geolocation State
+    if (!('navigator' in window) || !('geolocation' in navigator)) {
+      setLocState('unsupported');
+    } else if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        setLocState(result.state);
+        
+        result.onchange = () => {
+          setLocState(result.state);
+        };
+      } catch (err) {
+        setLocState('prompt');
+      }
+    } else {
+      // Safari fallback
+      const coords = user?.location;
+      if (coords && coords.latitude && coords.longitude) {
+        setLocState('granted');
+      } else {
+        setLocState('prompt');
+      }
+    }
+  };
+
+  useEffect(() => {
+    syncBrowserStates();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncBrowserStates();
+      }
+    };
+    window.addEventListener('focus', syncBrowserStates);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', syncBrowserStates);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
+
+  const handleEnableLocation = () => {
+    if (!('navigator' in window) || !('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by your browser.');
+      setLocState('unsupported');
+      return;
+    }
+
+    if (locLoading) return;
+    setLocLoading(true);
+    setLocState('fetching');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await api.put('/api/auth/location', { latitude, longitude });
+          if (res.data.success) {
+            dispatch(loginSuccess({ token, user: { ...user, location: res.data.location } }));
+            toast.success('Location acquired and saved!');
+          }
+        } catch (err) {
+          toast.success('Location acquired!');
+        } finally {
+          setLocLoading(false);
+          syncBrowserStates();
+        }
+      },
+      (error) => {
+        setLocLoading(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocState('denied');
+            toast.error('Location permission denied. Please allow location access in browser settings.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocState('prompt');
+            if (!navigator.onLine) {
+              toast.error('Location unavailable. You are currently offline. Please check your internet connection.');
+            } else {
+              toast.error('Location unavailable. Your device GPS or location service might be disabled.');
+            }
+            break;
+          case error.TIMEOUT:
+            setLocState('prompt');
+            toast.error('Location request timed out. Please ensure GPS is enabled and try again.');
+            break;
+          default:
+            setLocState('prompt');
+            toast.error(`Location error: ${error.message || 'Failed to acquire location.'}`);
+            break;
+        }
+        syncBrowserStates();
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  const handleEnableNotifications = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      toast.error('Notifications not supported on this browser.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifState(permission);
+      if (permission !== 'granted') {
+        toast.error('Notifications permission was denied. Please unlock in browser settings.');
+        return;
+      }
+
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        registration = await navigator.serviceWorker.register('/sw.js');
+      }
+      await navigator.serviceWorker.ready;
+
+      const isAdminUser = user?.role === 'admin';
+      const keyEndpoint = isAdminUser ? '/api/admin/vapid-public-key' : '/api/auth/vapid-public-key';
+      const subEndpoint = isAdminUser ? '/api/admin/subscribe' : '/api/auth/subscribe';
+
+      const keyRes = await api.get(keyEndpoint);
+      if (!keyRes.data?.success || !keyRes.data?.publicKey) {
+        throw new Error('Failed to retrieve server encryption key.');
+      }
+
+      const subscribeOptions = {
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyRes.data.publicKey)
+      };
+
+      const subscription = await registration.pushManager.subscribe(subscribeOptions);
+
+      await api.post(subEndpoint, { subscription });
+      
+      toast.success('Notifications enabled successfully!');
+      syncBrowserStates();
+    } catch (err) {
+      console.error('[Notification Enable Error]', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to enable notifications.');
+    }
+  };
+
+  const handleDisableNotifications = async () => {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        const isAdminUser = user?.role === 'admin';
+        const subEndpoint = isAdminUser ? '/api/admin/unsubscribe' : '/api/auth/unsubscribe';
+        await api.post(subEndpoint, { endpoint: subscription.endpoint }).catch(() => {});
+        await subscription.unsubscribe();
+        toast.success('Notifications disabled successfully.');
+      }
+      syncBrowserStates();
+    } catch (err) {
+      console.error('Disable notifications error:', err);
+      toast.error('Failed to disable notifications.');
+    }
+  };
+
+  const handleOpenSettingsGuide = (type) => {
+    const text = type === 'location' 
+      ? 'To allow location: Tap the lock icon in your browser URL bar and change Location permission to Allow.'
+      : 'To allow notifications: Tap the lock icon in your browser URL bar and change Notifications permission to Allow.';
+    toast.error(text, { id: 'settings-guide-toast', duration: 6000 });
+  };
 
   const [addresses, setAddresses] = useState(user?.addresses || []);
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -58,7 +265,23 @@ export default function ProfilePage() {
   });
   const [updatingProfile, setUpdatingProfile] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            const isAdminUser = user?.role === 'admin';
+            const endpoint = isAdminUser ? '/api/admin/unsubscribe' : '/api/auth/unsubscribe';
+            await api.post(endpoint, { endpoint: subscription.endpoint }).catch(() => {});
+            await subscription.unsubscribe().catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to unsubscribe push on logout:', e);
+    }
     dispatch(logout());
     toast.success('Logged out');
     navigate('/login');
@@ -406,6 +629,114 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* System Permissions & Settings Card */}
+      <div className="bg-sys-surface border border-sys-border rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="flex items-center space-x-2 border-b border-sys-border pb-3">
+          <Settings size={18} className="text-[#40A2E3]" />
+          <h3 className="text-xs font-black text-[#0F172A] dark:text-white">System Permissions & PWA Settings</h3>
+        </div>
+
+        <div className="space-y-4 text-xs font-semibold">
+          {/* Notifications Permission */}
+          <div className="flex items-center justify-between py-1">
+            <div className="space-y-0.5">
+              <span className="text-[#0F172A] dark:text-white font-bold">Push Notifications</span>
+              <p className="text-[10px] text-[#64748B] dark:text-slate-400">
+                {notifState === 'granted' && hasPushSub && <span className="text-emerald-500 font-extrabold">✅ Enabled</span>}
+                {notifState === 'granted' && !hasPushSub && <span className="text-amber-500 font-extrabold">⚠️ Out of Sync (Recreating...)</span>}
+                {notifState === 'denied' && <span className="text-red-500 font-extrabold">❌ Permission Denied</span>}
+                {notifState === 'default' && <span className="text-slate-500 font-extrabold">Disabled</span>}
+                {notifState === 'unsupported' && <span className="text-slate-400 font-extrabold">Unsupported on this Browser</span>}
+              </p>
+            </div>
+            
+            {notifState === 'unsupported' ? (
+              <span className="text-slate-400 text-[11px]">N/A</span>
+            ) : notifState === 'denied' ? (
+              <button
+                type="button"
+                onClick={() => handleOpenSettingsGuide('notifications')}
+                className="py-1.5 px-3 rounded-lg bg-amber-500 text-white text-[10px] font-black hover:bg-amber-600 transition-colors"
+              >
+                Open Settings
+              </button>
+            ) : notifState === 'granted' && hasPushSub ? (
+              <button
+                type="button"
+                onClick={handleDisableNotifications}
+                className="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-[10px] font-black transition-colors"
+              >
+                Disable
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                className="py-1.5 px-3 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-[10px] font-black shadow-xs transition-colors"
+              >
+                Enable
+              </button>
+            )}
+          </div>
+
+          {/* Location Permission */}
+          <div className="flex items-center justify-between py-1 border-t border-slate-100 dark:border-slate-800/60 pt-3">
+            <div className="space-y-0.5">
+              <span className="text-[#0F172A] dark:text-white font-bold">Precise Location</span>
+              <p className="text-[10px] text-[#64748B] dark:text-slate-400">
+                {locState === 'granted' && <span className="text-emerald-500 font-extrabold">✅ Enabled</span>}
+                {locState === 'denied' && <span className="text-red-500 font-extrabold">❌ Permission Denied</span>}
+                {locState === 'fetching' && <span className="text-[#40A2E3] font-extrabold animate-pulse">Acquiring GPS Coords...</span>}
+                {(locState === 'prompt' || locState === 'default') && <span className="text-slate-500 font-extrabold">Disabled</span>}
+                {locState === 'unsupported' && <span className="text-slate-400 font-extrabold">Unsupported on this Browser</span>}
+              </p>
+            </div>
+
+            {locState === 'unsupported' ? (
+              <span className="text-slate-400 text-[11px]">N/A</span>
+            ) : locState === 'denied' ? (
+              <button
+                type="button"
+                onClick={() => handleOpenSettingsGuide('location')}
+                className="py-1.5 px-3 rounded-lg bg-amber-500 text-white text-[10px] font-black hover:bg-amber-600 transition-colors"
+              >
+                Open Settings
+              </button>
+            ) : locState === 'granted' ? (
+              <button
+                type="button"
+                onClick={handleEnableLocation}
+                disabled={locLoading}
+                className="py-1.5 px-3 rounded-lg bg-[#40A2E3]/10 hover:bg-[#40A2E3]/20 text-[#40A2E3] border border-[#40A2E3]/20 text-[10px] font-black transition-colors"
+              >
+                Refresh GPS
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableLocation}
+                disabled={locLoading}
+                className="py-1.5 px-3 rounded-lg bg-[#40A2E3] hover:bg-[#2E94D9] text-white text-[10px] font-black shadow-xs transition-colors"
+              >
+                Enable Location
+              </button>
+            )}
+          </div>
+
+          {/* Unified Dark Mode Control */}
+          <div className="flex items-center justify-between py-1 border-t border-slate-100 dark:border-slate-800/60 pt-3">
+            <span className="text-[#0F172A] dark:text-white font-bold">Dark Mode Theme</span>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={`w-11 h-6 rounded-full p-1 transition-colors flex items-center ${isDarkMode ? 'bg-[#40A2E3] justify-end' : 'bg-slate-200 dark:bg-slate-700 justify-start'}`}
+            >
+              <div className="w-4 h-4 rounded-full bg-white shadow-md"></div>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Logout Button */}
       <button
