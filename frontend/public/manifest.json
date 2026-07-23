@@ -1,0 +1,62 @@
+{
+  "name": "Loopers - Campus Quick Commerce",
+  "short_name": "Loopers",
+  "description": "Ultra-fast 10-minute campus quick commerce delivery network.",
+  "start_url": "/app",
+  "scope": "/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#40A2E3",
+  "background_color": "#0F172A",
+  "categories": [
+    "shopping",
+    "food",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/loopers.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/loopers.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Products",
+      "short_name": "Products",
+      "description": "Explore store catalog",
+      "url": "/app/products",
+      "icons": [
+        {
+          "src": "/loopers.svg",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "description": "Track active deliveries",
+      "url": "/app/orders",
+      "icons": [
+        {
+          "src": "/loopers.svg",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

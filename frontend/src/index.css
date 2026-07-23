@@ -1,0 +1,374 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   LOOPERS DESIGN SYSTEM
+   Premium • Minimal • Warm • Mobile First
+========================================================= */
+
+:root {
+
+  /* =====================
+     Brand
+  ===================== */
+
+  --sys-primary: #40A2E3;
+  --sys-primary-hover: #2E94D9;
+  --sys-primary-active: #1D83C7;
+  --sys-primary-soft: rgba(64, 162, 227, .10);
+
+  /* =====================
+     Background Hierarchy
+  ===================== */
+
+  --sys-background: #F7F5F1;
+  --sys-surface: #FFFCF8;
+  --sys-surface-secondary: #F2EEE8;
+  --sys-surface-tertiary: #ECE7DE;
+  --sys-surface-hover: #F8F4EE;
+
+  /* =====================
+     Borders
+  ===================== */
+
+  --sys-border: #E5DED5;
+  --sys-border-light: #EEE8E0;
+  --sys-border-strong: #D9D1C7;
+
+  /* =====================
+     Typography
+  ===================== */
+
+  --sys-text-primary: #20242B;
+  --sys-text-secondary: #6E7683;
+  --sys-text-muted: #959DA9;
+  --sys-text-disabled: #B6BDC7;
+
+  /* =====================
+     Semantic
+  ===================== */
+
+  --sys-success: #22C55E;
+  --sys-warning: #F59E0B;
+  --sys-error: #EF4444;
+
+  /* =====================
+     Radius
+  ===================== */
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* =====================
+     Shadows
+  ===================== */
+
+  --shadow-xs:
+    0 1px 2px rgba(15, 23, 42, .03);
+
+  --shadow-sm:
+    0 2px 8px rgba(15, 23, 42, .05);
+
+  --shadow-md:
+    0 10px 30px rgba(15, 23, 42, .07);
+
+  --shadow-lg:
+    0 18px 45px rgba(15, 23, 42, .10);
+
+  --shadow-primary:
+    0 8px 24px rgba(64, 162, 227, .22);
+
+  /* =====================
+     Motion
+  ===================== */
+
+  --transition-fast: 140ms cubic-bezier(.2, .8, .2, 1);
+  --transition-normal: 220ms cubic-bezier(.2, .8, .2, 1);
+
+}
+
+/* ========================================================= */
+
+.dark {
+
+  --sys-primary: #40A2E3;
+  --sys-primary-hover: #5AB3EC;
+  --sys-primary-active: #7AC3F0;
+  --sys-primary-soft: rgba(64, 162, 227, .14);
+
+  /* Backgrounds */
+
+  --sys-background: #101214;
+  --sys-surface: #191C20;
+  --sys-surface-secondary: #21252B;
+  --sys-surface-tertiary: #292F36;
+  --sys-surface-hover: #303741;
+
+  /* Borders */
+
+  --sys-border: #313843;
+  --sys-border-light: #3B4452;
+  --sys-border-strong: #4A5565;
+
+  /* Typography */
+
+  --sys-text-primary: #F5F7FA;
+  --sys-text-secondary: #BAC2CC;
+  --sys-text-muted: #9098A6;
+  --sys-text-disabled: #6F7885;
+
+  /* Semantic */
+
+  --sys-success: #22C55E;
+  --sys-warning: #F59E0B;
+  --sys-error: #EF4444;
+
+  /* Shadows */
+
+  --shadow-xs:
+    0 2px 3px rgba(0, 0, 0, .18);
+
+  --shadow-sm:
+    0 6px 14px rgba(0, 0, 0, .22);
+
+  --shadow-md:
+    0 16px 40px rgba(0, 0, 0, .34);
+
+  --shadow-lg:
+    0 30px 70px rgba(0, 0, 0, .45);
+
+  --shadow-primary:
+    0 8px 28px rgba(64, 162, 227, .20);
+
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #40A2E3;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Leaflet Map Styling */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #e2e8f0 !important;
+  border-radius: 1rem;
+}
+
+.dark .leaflet-container {
+  background: #1e293b !important;
+}
+
+.dark .leaflet-tile {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3);
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseSubtle {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 2s infinite ease-in-out;
+}
+
+/* Safe Area Inset Helpers for Mobile Notches & Gesture Bars */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Touch Action & Native Mobile UI Optimizations */
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* =========================================================
+   LANDING PAGE STYLES
+========================================================= */
+
+:root {
+  --radius: 1rem;
+
+  --background: oklch(0.985 0.006 85);
+  --foreground: oklch(0.18 0.02 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 240);
+  --primary: oklch(0.68 0.14 232);
+  --primary-foreground: oklch(0.99 0.005 240);
+  --primary-soft: oklch(0.94 0.04 232);
+  --secondary: oklch(0.68 0.14 145);
+  --secondary-foreground: oklch(0.15 0.05 145);
+  --secondary-soft: oklch(0.95 0.04 145);
+  --muted: oklch(0.96 0.008 85);
+  --muted-foreground: oklch(0.48 0.02 240);
+  --accent: oklch(0.75 0.09 65);
+  --accent-foreground: oklch(0.22 0.04 60);
+  --accent-soft: oklch(0.95 0.03 75);
+  --destructive: oklch(0.62 0.22 27);
+  --destructive-foreground: oklch(0.99 0.005 240);
+  --border: oklch(0.9 0.01 85);
+  --input: oklch(0.9 0.01 85);
+  --ring: oklch(0.68 0.14 232);
+  --surface: oklch(0.98 0.006 85);
+  --surface-elevated: oklch(1 0 0);
+  --card-inverse: oklch(0.18 0.02 240);
+  --card-inverse-foreground: oklch(0.99 0.005 240);
+  --card-inverse-accent: oklch(0.62 0.22 27);
+  --shop-freely-bg: oklch(0.95 0.04 232);
+  --shop-freely-text: oklch(0.35 0.12 232);
+}
+
+
+
+@keyframes bag-float {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-18px) rotate(1.5deg); }
+}
+@keyframes bag-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.35; }
+  50% { transform: scaleX(0.82); opacity: 0.2; }
+}
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.08); }
+  66% { transform: translate(-20px, 25px) scale(0.95); }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(6deg); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-bag-float {
+  animation: bag-float 6s ease-in-out infinite;
+}
+.animate-bag-shadow {
+  animation: bag-shadow 6s ease-in-out infinite;
+}
+.animate-blob {
+  animation: blob-drift 14s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: float-slow 5s ease-in-out infinite;
+}
