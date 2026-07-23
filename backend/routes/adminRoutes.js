@@ -8,6 +8,7 @@ import {
   outForDeliveryOrder,
   deliverOrder,
   cancelOrderAdmin,
+  downloadOrderPrintout,
   getVapidPublicKey,
   subscribeAdmin,
   unsubscribeAdmin
